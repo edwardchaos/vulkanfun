@@ -155,8 +155,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="VulkanApp.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="test_vulkan.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="VulkanApp.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
