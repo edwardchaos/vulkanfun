@@ -1,9 +1,18 @@
 #pragma once
 
+#include <optional>
 #include <vector>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
+
+struct QueueFamilyIndices{
+  std::optional<uint32_t> graphics_family;
+
+  bool isComplete(){
+    return graphics_family.has_value();
+  }
+};
 
 class VulkanApp {
  public:
@@ -21,6 +30,8 @@ class VulkanApp {
   // standard set of validation layers
   const std::vector<const char*> validation_layers_ = {
       "VK_LAYER_KHRONOS_validation"};
+
+  VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -78,4 +89,25 @@ class VulkanApp {
   static void DestroyDebugUtilsMessengerEXT(
       VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
       const VkAllocationCallbacks* pAllocator);
+
+  // Select a graphics card
+  void pickPhysicalDevice();
+
+  /*
+  * Check device if it supports the operations we need
+  */
+  bool isDeviceSuitable(VkPhysicalDevice device);
+
+  /*
+  * Finds queue families of the device and returns an index to 
+  * a queue family that supports at minimum vk_queue_graphics_bit.
+  * 
+  * If no queue families of the device support the minimum requirement,
+  * the returned indices is not complete.
+  * 
+  * eg.
+  * auto indices = findQueueFamilies(device);
+  * if(indices.isComplete()) // A valid queue family exists for this device.
+  */
+  QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 };

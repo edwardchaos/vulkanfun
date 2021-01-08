@@ -27,6 +27,7 @@ void VulkanApp::DestroyDebugUtilsMessengerEXT(
     func(instance, debugMessenger, pAllocator);
   }
 }
+
 void VulkanApp::run() {
   initWindow();
   initVulkan();
@@ -42,15 +43,19 @@ void VulkanApp::initWindow() {
 
   window_ = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
 }
+
 void VulkanApp::initVulkan() {
   createInstance();
   setupDebugMessenger();
+  pickPhysicalDevice();
 }
+
 void VulkanApp::mainLoop() {
   while (!glfwWindowShouldClose(window_)) {
     glfwPollEvents();
   }
 }
+
 void VulkanApp::cleanUp() {
   // Clean up other vulkan resources here first before instance
   if (enable_valid_layers_) {
@@ -208,3 +213,73 @@ void VulkanApp::setupDebugMessenger() {
   }
 }
 
+void VulkanApp::pickPhysicalDevice() {
+  uint32_t device_count = 0;
+
+  vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
+
+  if (device_count == 0){
+    throw std::runtime_error(
+      "Failed to find GPUs with Vulkan support");
+  }
+
+  std::vector<VkPhysicalDevice> devices(device_count);
+
+  vkEnumeratePhysicalDevices(
+    instance_, &device_count, devices.data());
+
+  // Check each card to see if they support operations we need
+  for(const auto &device:devices){
+    if(isDeviceSuitable(device)){
+      // Just select the first device
+      physical_device_ = device;
+      break;
+    }
+  }
+
+  if(physical_device_ == VK_NULL_HANDLE)
+    throw std::runtime_error("Failed to find a suitable GPU");
+}
+
+bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device){
+  VkPhysicalDeviceProperties deviceProperties;
+  VkPhysicalDeviceFeatures deviceFeatures;
+
+  // Get name, type, supported vulkan version etc.
+  vkGetPhysicalDeviceProperties(device, &deviceProperties);
+
+  // Get optional features
+  vkGetPhysicalDeviceFeatures(device, &deviceFeatures);
+
+  if(deviceProperties.deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) return false;
+  if(!deviceFeatures.geometryShader) return false;
+
+  // Check if device has queue family we need
+  QueueFamilyIndices indices = findQueueFamilies(device);
+  if(!indices.isComplete()) return false;
+
+  return true;
+}
+
+QueueFamilyIndices VulkanApp::findQueueFamilies(VkPhysicalDevice device){
+  QueueFamilyIndices indices;
+
+  uint32_t queue_family_count = 0;
+  vkGetPhysicalDeviceQueueFamilyProperties(
+    device, &queue_family_count, nullptr);
+
+  std::vector<VkQueueFamilyProperties> queue_families(queue_family_count);
+  vkGetPhysicalDeviceQueueFamilyProperties(
+    device, &queue_family_count, queue_families.data());
+  
+  // Identify queue families that support graphics
+  int i = 0;
+  for(const auto& queue_family : queue_families){
+    if(queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT){
+      indices.graphics_family = i;
+      break;
+    }
+    ++i;
+  }
+  return indices;
+}
