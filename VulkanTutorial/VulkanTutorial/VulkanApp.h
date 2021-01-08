@@ -28,25 +28,44 @@ class VulkanApp {
   const bool enable_valid_layers_ = true;
 #endif
 
+  // Initialize glfw window
   void initWindow();
+
+  // Main init function, creates instance and subobjects
   void initVulkan();
+
+  // Main loop for drawing
   void mainLoop();
+  
   void cleanUp();
+
+  // Create vulkan instance, called in initVulkan
   void createInstance();
+
+  // Verify if all required validation layers 'validation_layers_' are supported
   bool checkValidationLayerSupport();
+
+  // Vulkan is implementation agnostic, it needs to specify extensions to
+  // interface with the window manager and more.
   std::vector<const char*> getRequiredExtensions();
+
+  // Populates the struct for creating a debug messenger
   void populateDebugMessengerCreateInfo(
     VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+
+  // Setup debug messenger to call our callback instead of just putting 
+  // everything on stdout
   void setupDebugMessenger();
 
+  // Our custom debug messenger callback
   static VKAPI_ATTR VkBool32 VKAPI_CALL
   debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
                 VkDebugUtilsMessageTypeFlagsEXT message_type,
                 const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
                 void* pUserData);
 
-  /* Extension functions are not loaded by default, we need to look up its address
-  * ourselves with this wrapper
+  /* Extension functions are not loaded by default, we need to look up its
+  * address ourselves with this wrapper
   */
   static VkResult CreateDebugUtilsMessengerEXT(
       VkInstance instance,

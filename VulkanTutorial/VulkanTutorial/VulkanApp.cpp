@@ -150,8 +150,6 @@ bool VulkanApp::checkValidationLayerSupport() {
 
 std::vector<const char*> 
 VulkanApp::getRequiredExtensions() {
-  // Vulkan is implementation agnostic, it needs to specify extensions to
-  // interface with the window manager
   uint32_t glfw_extension_count = 0;
   const char** glfw_extensions;
   glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
