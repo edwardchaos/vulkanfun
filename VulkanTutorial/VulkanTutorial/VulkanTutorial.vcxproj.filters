@@ -40,5 +40,11 @@
     <None Include="shader.frag">
       <Filter>Source Files\Shaders</Filter>
     </None>
+    <None Include="shaders_compile.bat">
+      <Filter>Source Files\Shaders</Filter>
+    </None>
+    <None Include="linux_shadercompile.sh">
+      <Filter>Source Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

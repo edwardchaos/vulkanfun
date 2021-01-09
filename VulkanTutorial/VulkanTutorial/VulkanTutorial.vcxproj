@@ -163,8 +163,10 @@
     <ClInclude Include="VulkanApp.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="linux_shadercompile.sh" />
     <None Include="shader.frag" />
     <None Include="shader.vert" />
+    <None Include="shaders_compile.bat" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

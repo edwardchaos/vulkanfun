@@ -642,11 +642,28 @@ void VulkanApp::createImageViews(){
 }
 
 void VulkanApp::createGraphicsPipeline(){
-  
+  auto vert_shader_code = readFile("vert.spv");
+  auto frag_shader_code = readFile("frag.spv");
+}
 
+std::vector<char> VulkanApp::readFile(const std::string& filename){
+  // Read spir-v shaders as bytes and store them in return value;
+  // 'ate' start reading from end of file (for getting file size)
+  std::ifstream file(filename, std::ios::ate | std::ios::binary);
 
+  if (!file.is_open()) {
+    throw std::runtime_error("failed to open file!");
+  }
 
+  size_t file_size = (size_t) file.tellg();
+  std::cout << "shader file size:" << file_size << std::endl;
+  std::vector<char> buffer(file_size);
 
+  // Back to beginning
+  file.seekg(0);
+  // Read all data from beginning
+  file.read(buffer.data(), file_size);
 
-
+  file.close();
+  return buffer;
 }

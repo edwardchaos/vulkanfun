@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <vector>
+#include <fstream>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
@@ -173,4 +174,6 @@ class VulkanApp {
   void createImageViews();
 
   void createGraphicsPipeline();
+
+  static std::vector<char> readFile(const std::string& filename); 
 };
