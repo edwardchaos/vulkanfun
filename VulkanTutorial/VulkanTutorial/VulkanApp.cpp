@@ -1,5 +1,6 @@
 #include "VulkanApp.h"
 
+#include <algorithm>
 #include <iostream>
 #include <set>
 
@@ -51,6 +52,7 @@ void VulkanApp::initVulkan() {
   createSurface(); // The platform specific 'thing' to draw on
   pickPhysicalDevice();
   createLogicalDevice();
+  createSwapChain();
 }
 
 void VulkanApp::mainLoop() {
@@ -60,6 +62,9 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  // Destroy swap chain before logical device
+  vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
+
   // Logical device 
   vkDestroyDevice(logical_device_, nullptr);
 
@@ -267,6 +272,19 @@ bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device){
   QueueFamilyIndices indices = findQueueFamilies(device);
   if(!indices.isComplete()) return false;
 
+  // Check device for required extensions(swap chain, etc)
+  bool extensions_supported = checkDeviceExtensionSupport(device);
+  if(!extensions_supported) return false;
+
+  // Query swap chain support
+  auto swap_chain_details = querySwapChainSupport(device);
+  // has at least 1 supported image format and 1 presentation mode for our
+  // surface.
+  bool swap_chain_adequate = !swap_chain_details.formats.empty() &&
+    !swap_chain_details.present_modes.empty();
+  if(!swap_chain_adequate) return false;
+  // Still need to choose the right settings for swap chain.
+
   return true;
 }
 
@@ -345,7 +363,9 @@ void VulkanApp::createLogicalDevice(){
   // Eg. VK_KHR_swapchain for displaying rendered images to windows
   // Some devices don't have VK_KHR_swapchain like compute only devices.
   
-  logical_device_info.enabledExtensionCount = 0;
+  logical_device_info.enabledExtensionCount =
+    static_cast<uint32_t>(device_extensions_.size());
+  logical_device_info.ppEnabledExtensionNames = device_extensions_.data();
 
   // NOTE: Device specific validation layers are deprecated. Following is
   // ignored by latest vulkan. Instead, the validation layers specified before
@@ -381,3 +401,193 @@ void VulkanApp::createSurface() {
     throw std::runtime_error("Failed to create window surface");
   }
 }
+
+bool VulkanApp::checkDeviceExtensionSupport(VkPhysicalDevice device){
+  uint32_t ext_count = 0;
+
+  vkEnumerateDeviceExtensionProperties(device, nullptr, &ext_count, nullptr);
+
+  std::vector<VkExtensionProperties> available_extensions(ext_count);
+
+  vkEnumerateDeviceExtensionProperties(device, nullptr, &ext_count, 
+    available_extensions.data());
+
+  std::set<std::string> required_ext(device_extensions_.begin(),
+    device_extensions_.end());
+
+  for(const auto& ext : available_extensions){
+    required_ext.erase(ext.extensionName);
+  }
+
+  return required_ext.empty();
+}
+
+SwapChainSupportDetails
+VulkanApp::querySwapChainSupport(VkPhysicalDevice device){
+  SwapChainSupportDetails details;
+
+  // Query surface capabilities
+  vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_,
+    &details.capabilities);
+
+  // Query supported surface formats need to make sure our glfw surface is
+  // compatible.
+
+  uint32_t format_count = 0;
+
+  vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &format_count,
+    nullptr);
+
+  if(format_count > 0){
+    details.formats.resize(format_count);
+    vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface_, &format_count,
+      details.formats.data());
+  }
+
+  // Query supported presentation modes
+  uint32_t present_count = 0;
+  vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &present_count,
+    nullptr);
+
+  if(present_count > 0){
+    details.present_modes.resize(present_count);
+    vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface_, &present_count,
+      details.present_modes.data());
+  }
+
+  return details;
+}
+
+VkSurfaceFormatKHR VulkanApp::chooseSwapSurfaceFormat(
+    const std::vector<VkSurfaceFormatKHR> &available_formats){
+  if(available_formats.empty())
+    throw std::runtime_error("No available formats");
+
+  // Format specifies color channel and types eg.VK_FORMAT_B8G8R8A8_SRGB
+
+  // color space specifies supported color space eg. SRGB
+
+  for(const auto& avail_format : available_formats){
+    if(avail_format.format == VK_FORMAT_B8G8R8A8_SRGB &&
+       avail_format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR){
+      return avail_format;
+    }
+  }
+
+  // Otherwise settle with first format
+  return available_formats[0];
+}
+
+VkPresentModeKHR VulkanApp::chooseSwapPresentMode(
+const std::vector<VkPresentModeKHR> &available_present_modes){
+  if(available_present_modes.empty())
+    throw std::runtime_error("No available present mode");
+
+  for(const auto& present_mode : available_present_modes){
+    // Look for triple buffering
+    if(present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+      return present_mode;
+  }
+
+  // This is guaranteed to be available.
+  return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D VulkanApp::chooseSwapExtent(
+const VkSurfaceCapabilitiesKHR& capabilities){
+  if(capabilities.currentExtent.width != UINT32_MAX)
+    return capabilities.currentExtent;
+
+  // glfw window size specified in screen coordinates, not pixels
+  int width_px ,height_px;
+  glfwGetFramebufferSize(window_, &width_px, &height_px);
+
+  // Get the actual pixel dimensions of the window
+  VkExtent2D actualExtent = {
+    static_cast<uint32_t>(width_px),
+    static_cast<uint32_t>(height_px)
+  };
+
+  // Extent needs to be within the bounds of the swap chain capabilities.
+  actualExtent.width = std::max(capabilities.minImageExtent.width,
+    std::min(capabilities.maxImageExtent.width, actualExtent.width));
+  actualExtent.height = std::max(capabilities.minImageExtent.height,
+    std::min(capabilities.maxImageExtent.height, actualExtent.height));
+
+  return actualExtent;
+}
+
+void VulkanApp::createSwapChain(){
+  SwapChainSupportDetails swap_chain_support =
+    querySwapChainSupport(physical_device_);
+
+  VkSurfaceFormatKHR surface_format = chooseSwapSurfaceFormat(
+    swap_chain_support.formats);
+
+  VkPresentModeKHR present_mode = chooseSwapPresentMode(
+    swap_chain_support.present_modes);
+
+  VkExtent2D extent = chooseSwapExtent(swap_chain_support.capabilities);
+
+  // Minimum number of images in the swap chain
+  uint32_t min_img_count = swap_chain_support.capabilities.minImageCount;
+  // Request at least 1 more image than minimum for good luck
+  ++min_img_count;
+
+  if(swap_chain_support.capabilities.maxImageCount > 0 &&
+    min_img_count > swap_chain_support.capabilities.maxImageCount){
+    min_img_count = swap_chain_support.capabilities.maxImageCount;
+  }
+
+  // Create the struct for creating a swap chain
+  VkSwapchainCreateInfoKHR sc_create_info{};
+
+  sc_create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+  sc_create_info.surface = surface_;
+
+  sc_create_info.minImageCount = min_img_count;
+  sc_create_info.imageFormat = surface_format.format;
+  sc_create_info.imageColorSpace = surface_format.colorSpace;
+  sc_create_info.imageExtent = extent;
+  sc_create_info.imageArrayLayers = 1; // 1 unless steroscopic 3D application
+
+  // alternative eg. VK_IMAGE_USAGE_TRANSFER_DST_BIT
+  sc_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+
+  /* Handle possibility of multiple queue handles,
+  * If graphics and presentation queue families are different, ownership
+  * of swap chain needs to be shared (slower).
+  * Ownership can be transfered but there's work to do for that.
+  */ 
+
+  auto indices = findQueueFamilies(physical_device_);
+  uint32_t queue_fam_indices[]={indices.graphics_family.value(),
+  indices.present_family.value()};
+
+  if(indices.graphics_family != indices.present_family){
+    sc_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+    sc_create_info.queueFamilyIndexCount = 2;
+    sc_create_info.pQueueFamilyIndices = queue_fam_indices;
+  }else{
+    sc_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    sc_create_info.queueFamilyIndexCount = 0; //optional but shown here
+    sc_create_info.pQueueFamilyIndices = nullptr; // same.
+  }
+
+  sc_create_info.preTransform = 
+    swap_chain_support.capabilities.currentTransform;
+  sc_create_info.presentMode = present_mode;
+  // How the window should blend with other windows.
+  sc_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  // If another window is infront
+  sc_create_info.clipped = VK_TRUE;
+  
+  // If window is resized, a new one has to be created and a refernce to the
+  // old one put here. We'll only have 1 swapchain, 1 size.
+  sc_create_info.oldSwapchain = VK_NULL_HANDLE;
+
+  if(vkCreateSwapchainKHR(logical_device_, &sc_create_info, nullptr,
+    &swap_chain_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create swap chain.");
+  }
+ }

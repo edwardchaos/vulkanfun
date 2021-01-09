@@ -15,6 +15,13 @@ struct QueueFamilyIndices{
   }
 };
 
+// Contain details about the swap chain to see if it's suitable.
+struct SwapChainSupportDetails{
+  VkSurfaceCapabilitiesKHR capabilities;
+  std::vector<VkSurfaceFormatKHR> formats;
+  std::vector<VkPresentModeKHR> present_modes;
+};
+
 class VulkanApp {
  public:
   void run();
@@ -36,10 +43,17 @@ class VulkanApp {
   const std::vector<const char*> validation_layers_ = {
       "VK_LAYER_KHRONOS_validation"};
 
+  const std::vector<const char*> device_extensions_ = {
+    VK_KHR_SWAPCHAIN_EXTENSION_NAME
+  };
+
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
   VkDevice logical_device_;
   VkQueue graphics_queue_;
   VkQueue present_queue_;
+
+  VkSwapchainKHR swap_chain_;
+  std::vector<VkImage> swapchain_images;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -130,4 +144,23 @@ class VulkanApp {
   * Create platform specific surface for displaying things on screen.
   */
   void createSurface();
+
+  /* Check that the device supports things like swap chain for presenting
+  */
+  bool checkDeviceExtensionSupport(VkPhysicalDevice device);
+
+  SwapChainSupportDetails
+  querySwapChainSupport(VkPhysicalDevice device);
+
+  VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+  const std::vector<VkSurfaceFormatKHR> &available_formats);
+
+  VkPresentModeKHR chooseSwapPresentMode(
+  const std::vector<VkPresentModeKHR> &available_present_modes);
+
+  // Resolution of the swap chain images
+  VkExtent2D chooseSwapExtent(
+  const VkSurfaceCapabilitiesKHR& capabilities);
+
+  void createSwapChain();
 };
