@@ -1,6 +1,7 @@
 #include "VulkanApp.h"
 
 #include <iostream>
+#include <set>
 
 VkResult VulkanApp::CreateDebugUtilsMessengerEXT(
   VkInstance instance,
@@ -29,8 +30,8 @@ void VulkanApp::DestroyDebugUtilsMessengerEXT(
 }
 
 void VulkanApp::run() {
-  initWindow();
-  initVulkan();
+  initWindow(); // Empty rectangular container
+  initVulkan(); // Main interface between vulkan and this application
   mainLoop();
   cleanUp();
 }
@@ -47,6 +48,7 @@ void VulkanApp::initWindow() {
 void VulkanApp::initVulkan() {
   createInstance();
   setupDebugMessenger();
+  createSurface(); // The platform specific 'thing' to draw on
   pickPhysicalDevice();
   createLogicalDevice();
 }
@@ -65,6 +67,9 @@ void VulkanApp::cleanUp() {
   if (enable_valid_layers_) {
     DestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
   }
+
+  // Destroy surface, needs to be done before the instance.
+  vkDestroySurfaceKHR(instance_, surface_, nullptr);
 
   // Clean up vulkan instance
   vkDestroyInstance(instance_, nullptr);
@@ -268,6 +273,9 @@ bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device){
 QueueFamilyIndices VulkanApp::findQueueFamilies(VkPhysicalDevice device){
   QueueFamilyIndices indices;
 
+  // For finding queue family that supports presenting on a surface.
+  VkBool32 present_support = false;
+
   uint32_t queue_family_count = 0;
   vkGetPhysicalDeviceQueueFamilyProperties(
     device, &queue_family_count, nullptr);
@@ -279,6 +287,14 @@ QueueFamilyIndices VulkanApp::findQueueFamilies(VkPhysicalDevice device){
   // Identify queue families that support graphics
   int i = 0;
   for(const auto& queue_family : queue_families){
+
+    // Present queue family and graphics queue family need not be the same.
+    vkGetPhysicalDeviceSurfaceSupportKHR(
+      device, i, surface_, &present_support);
+    if(present_support){
+      indices.present_family = i;
+    }
+
     if(queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT){
       indices.graphics_family = i;
       break;
@@ -294,15 +310,24 @@ void VulkanApp::createLogicalDevice(){
   }
   auto indices = findQueueFamilies(physical_device_);
 
-  VkDeviceQueueCreateInfo queue_create_info{}; 
-  queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-  queue_create_info.queueFamilyIndex = indices.graphics_family.value();
-  queue_create_info.queueCount = 1;
+  std::set<uint32_t> unique_queue_families{
+    indices.graphics_family.value(), indices.present_family.value()};
 
-  // Priority lets vulkan prioritize multiple command buffers. It's required
-  // even if there is only 1 queue.
-  float queue_priority = 1.0;
-  queue_create_info.pQueuePriorities = &queue_priority;
+  std::vector<VkDeviceQueueCreateInfo> queue_create_infos{}; 
+
+  for(const auto& queuefamily : unique_queue_families){
+    VkDeviceQueueCreateInfo queue_create_info{};
+
+    queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_info.queueFamilyIndex = queuefamily;
+    queue_create_info.queueCount = 1;
+
+    // Priority lets vulkan prioritize multiple command buffers. It's required
+    // even if there is only 1 queue.
+    float queue_priority = 1.0;
+    queue_create_info.pQueuePriorities = &queue_priority;
+    queue_create_infos.push_back(queue_create_info);
+  }
 
   // Specify device features that we'll use.
   // TODO: everything is VK_FALSE for now, select features later.
@@ -311,7 +336,7 @@ void VulkanApp::createLogicalDevice(){
   VkDeviceCreateInfo logical_device_info{};
 
   logical_device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  logical_device_info.pQueueCreateInfos = &queue_create_info;
+  logical_device_info.pQueueCreateInfos = queue_create_infos.data();
   logical_device_info.queueCreateInfoCount = 1;
   logical_device_info.pEnabledFeatures = &device_features;
 
@@ -339,9 +364,20 @@ void VulkanApp::createLogicalDevice(){
     throw std::runtime_error("Failed to create a logical device");
   }
 
-  // Queue is created when logical device is created, but we don't have a handle
-  // to it yet.
+  // Queue is created when logical device is created, but we don't have 
+  // a handle to it yet.
 
+  // If graphics and present queues are the same, these handles will be the same.
   vkGetDeviceQueue(logical_device_, indices.graphics_family.value(), 0,
     &graphics_queue_);
+  vkGetDeviceQueue(logical_device_, indices.present_family.value(), 0,
+    &present_queue_);
+}
+
+void VulkanApp::createSurface() {
+  // Window system integration (WSI) create surface for specific platform
+  if (glfwCreateWindowSurface(instance_, window_, nullptr, &surface_) !=
+      VK_SUCCESS){
+    throw std::runtime_error("Failed to create window surface");
+  }
 }

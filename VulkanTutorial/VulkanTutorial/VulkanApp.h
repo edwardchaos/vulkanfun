@@ -8,9 +8,10 @@
 
 struct QueueFamilyIndices{
   std::optional<uint32_t> graphics_family;
+  std::optional<uint32_t> present_family;
 
   bool isComplete(){
-    return graphics_family.has_value();
+    return graphics_family.has_value() && present_family.has_value();
   }
 };
 
@@ -26,7 +27,11 @@ class VulkanApp {
 
   // Handle debug messages from validation layers
   VkDebugUtilsMessengerEXT debug_messenger_;
-  
+
+  // Window system integration extension needed since vulkan is system 
+  // agnostic
+  VkSurfaceKHR surface_;
+
   // standard set of validation layers
   const std::vector<const char*> validation_layers_ = {
       "VK_LAYER_KHRONOS_validation"};
@@ -34,6 +39,7 @@ class VulkanApp {
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
   VkDevice logical_device_;
   VkQueue graphics_queue_;
+  VkQueue present_queue_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -119,4 +125,9 @@ class VulkanApp {
   * 
   */
   void createLogicalDevice();
+
+  /*
+  * Create platform specific surface for displaying things on screen.
+  */
+  void createSurface();
 };
