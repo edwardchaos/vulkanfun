@@ -48,6 +48,7 @@ void VulkanApp::initVulkan() {
   createInstance();
   setupDebugMessenger();
   pickPhysicalDevice();
+  createLogicalDevice();
 }
 
 void VulkanApp::mainLoop() {
@@ -57,6 +58,9 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  // Logical device 
+  vkDestroyDevice(logical_device_, nullptr);
+
   // Clean up other vulkan resources here first before instance
   if (enable_valid_layers_) {
     DestroyDebugUtilsMessengerEXT(instance_, debug_messenger_, nullptr);
@@ -282,4 +286,62 @@ QueueFamilyIndices VulkanApp::findQueueFamilies(VkPhysicalDevice device){
     ++i;
   }
   return indices;
+}
+
+void VulkanApp::createLogicalDevice(){
+  if(physical_device_ == VK_NULL_HANDLE){
+    std::runtime_error("Physical device is null, find physical device first.");
+  }
+  auto indices = findQueueFamilies(physical_device_);
+
+  VkDeviceQueueCreateInfo queue_create_info{}; 
+  queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+  queue_create_info.queueFamilyIndex = indices.graphics_family.value();
+  queue_create_info.queueCount = 1;
+
+  // Priority lets vulkan prioritize multiple command buffers. It's required
+  // even if there is only 1 queue.
+  float queue_priority = 1.0;
+  queue_create_info.pQueuePriorities = &queue_priority;
+
+  // Specify device features that we'll use.
+  // TODO: everything is VK_FALSE for now, select features later.
+  VkPhysicalDeviceFeatures device_features{};
+
+  VkDeviceCreateInfo logical_device_info{};
+
+  logical_device_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  logical_device_info.pQueueCreateInfos = &queue_create_info;
+  logical_device_info.queueCreateInfoCount = 1;
+  logical_device_info.pEnabledFeatures = &device_features;
+
+  // Similarly to instance creation, specify extensions and validation layers
+  // Difference is: device specific rather than whole application.
+  // Eg. VK_KHR_swapchain for displaying rendered images to windows
+  // Some devices don't have VK_KHR_swapchain like compute only devices.
+  
+  logical_device_info.enabledExtensionCount = 0;
+
+  // NOTE: Device specific validation layers are deprecated. Following is
+  // ignored by latest vulkan. Instead, the validation layers specified before
+  // is used both for application and device.
+  if(enable_valid_layers_){
+    logical_device_info.enabledLayerCount =
+      static_cast<uint32_t>(validation_layers_.size());
+    logical_device_info.ppEnabledLayerNames =
+      validation_layers_.data();
+  }else{
+    logical_device_info.enabledLayerCount = 0;
+  }
+
+  if(vkCreateDevice(physical_device_, &logical_device_info,
+    nullptr, &logical_device_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create a logical device");
+  }
+
+  // Queue is created when logical device is created, but we don't have a handle
+  // to it yet.
+
+  vkGetDeviceQueue(logical_device_, indices.graphics_family.value(), 0,
+    &graphics_queue_);
 }

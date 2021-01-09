@@ -32,6 +32,8 @@ class VulkanApp {
       "VK_LAYER_KHRONOS_validation"};
 
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
+  VkDevice logical_device_;
+  VkQueue graphics_queue_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -110,4 +112,11 @@ class VulkanApp {
   * if(indices.isComplete()) // A valid queue family exists for this device.
   */
   QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
+
+  /*
+  * After selecting a physical device, the logical device is created to
+  * interface with the physical one.
+  * 
+  */
+  void createLogicalDevice();
 };
