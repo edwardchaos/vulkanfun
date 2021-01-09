@@ -168,5 +168,7 @@ class VulkanApp {
 
   void createSwapChain();
   
+  // Views into images of the swap chain. These allow us to access parts
+  // of the image like format, extent, color space etc.
   void createImageViews();
 };
