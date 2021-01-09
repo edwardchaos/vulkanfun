@@ -53,6 +53,7 @@ void VulkanApp::initVulkan() {
   pickPhysicalDevice();
   createLogicalDevice();
   createSwapChain();
+  createImageViews();
 }
 
 void VulkanApp::mainLoop() {
@@ -62,6 +63,10 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  for(auto imgview: swapchain_imgviews_){
+    vkDestroyImageView(logical_device_, imgview, nullptr);
+  }
+
   // Destroy swap chain before logical device
   vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
 
@@ -602,3 +607,35 @@ void VulkanApp::createSwapChain(){
   swapchain_img_format_ = surface_format.format;
   swapchain_img_extent_ = extent;
  }
+
+void VulkanApp::createImageViews(){
+  swapchain_imgviews_.resize(swapchain_images_.size());
+
+  VkImageViewCreateInfo imgview_create_info{};
+  for(size_t i = 0; i < swapchain_images_.size(); ++i){
+    imgview_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    imgview_create_info.image = swapchain_images_[i];
+    imgview_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    imgview_create_info.format = swapchain_img_format_;
+
+    imgview_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imgview_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imgview_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    imgview_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+    // Image purpose and which part of image to access
+    imgview_create_info.subresourceRange.aspectMask = 
+      VK_IMAGE_ASPECT_COLOR_BIT;
+    // any mipmapping?
+    imgview_create_info.subresourceRange.baseMipLevel = 0;
+    imgview_create_info.subresourceRange.levelCount = 1;
+    imgview_create_info.subresourceRange.baseArrayLayer = 0;
+    imgview_create_info.subresourceRange.layerCount = 1;
+
+    if(vkCreateImageView(logical_device_, &imgview_create_info, nullptr,
+      &swapchain_imgviews_[i])
+      !=VK_SUCCESS){
+      throw std::runtime_error("Failed to create image view.");
+    }
+  }
+}

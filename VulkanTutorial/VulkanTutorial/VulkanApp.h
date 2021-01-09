@@ -57,6 +57,8 @@ class VulkanApp {
   VkFormat swapchain_img_format_;
   VkExtent2D swapchain_img_extent_;
 
+  std::vector<VkImageView> swapchain_imgviews_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -165,4 +167,6 @@ class VulkanApp {
   const VkSurfaceCapabilitiesKHR& capabilities);
 
   void createSwapChain();
+  
+  void createImageViews();
 };
