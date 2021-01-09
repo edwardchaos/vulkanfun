@@ -644,6 +644,36 @@ void VulkanApp::createImageViews(){
 void VulkanApp::createGraphicsPipeline(){
   auto vert_shader_code = readFile("vert.spv");
   auto frag_shader_code = readFile("frag.spv");
+
+  VkShaderModule vert_shader_module = createShaderModule(vert_shader_code);
+  VkShaderModule frag_shader_module = createShaderModule(frag_shader_code);
+
+  VkPipelineShaderStageCreateInfo vert_shader_ci{};
+  vert_shader_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+  // Use vertex shader code in vertex shading stage
+  vert_shader_ci.stage = VK_SHADER_STAGE_VERTEX_BIT;
+
+  vert_shader_ci.module = vert_shader_module;
+  vert_shader_ci.pName = "main"; // The function to invoke (entrypoint)
+  vert_shader_ci.pSpecializationInfo = nullptr; // specify shader constants
+
+  VkPipelineShaderStageCreateInfo frag_shader_ci{};
+  frag_shader_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+
+  // Use vertex shader code in vertex shading stage
+  frag_shader_ci.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  frag_shader_ci.module = frag_shader_module;
+  frag_shader_ci.pName = "main"; // The function to invoke (entrypoint)
+
+  VkPipelineShaderStageCreateInfo shader_stages[]=
+  {vert_shader_ci, frag_shader_ci};
+
+  vkDestroyShaderModule(logical_device_, vert_shader_module, nullptr);
+  vkDestroyShaderModule(logical_device_, frag_shader_module, nullptr);
+
+  // TODO: Use shader create infos to create the shader later
 }
 
 std::vector<char> VulkanApp::readFile(const std::string& filename){
@@ -666,4 +696,25 @@ std::vector<char> VulkanApp::readFile(const std::string& filename){
 
   file.close();
   return buffer;
+}
+
+VkShaderModule VulkanApp::createShaderModule(
+  const std::vector<char> &code){
+  
+  VkShaderModuleCreateInfo shader_ci{};
+
+  shader_ci.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+  shader_ci.codeSize = code.size();
+
+  // For reinterpret cast, data needs to satisfy alignment requirement of uint32
+  // std::vector handles that.
+  shader_ci.pCode = reinterpret_cast<const uint32_t*>(code.data());
+
+  VkShaderModule shader;
+  if(vkCreateShaderModule(logical_device_, &shader_ci, nullptr, &shader) !=
+    VK_SUCCESS){
+    throw std::runtime_error("Failed to create shader module");
+  }
+
+  return shader;
 }
