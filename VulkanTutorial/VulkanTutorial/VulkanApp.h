@@ -53,7 +53,9 @@ class VulkanApp {
   VkQueue present_queue_;
 
   VkSwapchainKHR swap_chain_;
-  std::vector<VkImage> swapchain_images;
+  std::vector<VkImage> swapchain_images_;
+  VkFormat swapchain_img_format_;
+  VkExtent2D swapchain_img_extent_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
