@@ -54,6 +54,7 @@ void VulkanApp::initVulkan() {
   createLogicalDevice();
   createSwapChain();
   createImageViews();
+  createRenderPass();
   createGraphicsPipeline();
 }
 
@@ -66,6 +67,7 @@ void VulkanApp::mainLoop() {
 void VulkanApp::cleanUp() {
   //Pipeline layout
   vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
+  vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
 
   for(auto imgview: swapchain_imgviews_){
     vkDestroyImageView(logical_device_, imgview, nullptr);
@@ -846,4 +848,59 @@ VkShaderModule VulkanApp::createShaderModule(
   }
 
   return shader;
+}
+
+void VulkanApp::createRenderPass(){
+  VkAttachmentDescription color_attachment{};
+
+  // Sigle color buffer
+  color_attachment.format = swapchain_img_format_;
+  color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+
+  // What to do with data in attachment before and after rendering,
+  // applies to color and depth data, not stencil data.
+
+  // Clear the values to a constant at the start (we'll clear to black)
+  color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+
+  // Rendered content stored to memory, can be read later on.
+  color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+  // Applies to stencil data, we don't have a stencil buffer
+  color_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  
+  // Which layout the image will have before render pass begins
+  color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  // Which layout to automatically transition to when render pass finishes.
+  color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+  // Subpasses, we'll just have one
+  VkAttachmentReference colorattachmentref{};
+
+  // Which attachment to reference to by idx in the attachment descriptions
+  colorattachmentref.attachment = 0;
+
+  // Which layout to have during the subpass
+  colorattachmentref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+  VkSubpassDescription subpass_desc{};
+  // May support compute subpasses in the future, be explicit
+  subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass_desc.colorAttachmentCount = 1;
+  subpass_desc.pColorAttachments = &colorattachmentref;
+
+  // We have attachment and basic subpass referencing. Create render pass
+  VkRenderPassCreateInfo rp_ci{};
+
+  rp_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  rp_ci.attachmentCount = 1;
+  rp_ci.pAttachments = &color_attachment;
+  rp_ci.subpassCount = 1;
+  rp_ci.pSubpasses = &subpass_desc;
+
+  if(vkCreateRenderPass(logical_device_, &rp_ci, nullptr, &render_pass_)
+    != VK_SUCCESS){
+    throw std::runtime_error("Failed to create render pass");
+  }
 }

@@ -61,6 +61,7 @@ class VulkanApp {
   std::vector<VkImageView> swapchain_imgviews_;
 
   // Commonly used to pass transformation matrices to vertex shader
+  VkRenderPass render_pass_;
   VkPipelineLayout pipeline_layout_;
 
 #ifdef NDEBUG
@@ -182,4 +183,10 @@ class VulkanApp {
 
   VkShaderModule createShaderModule(
     const std::vector<char> &shader_bytecode);
+
+  /* Tell vulkan about framebuffer attachments, # of color and depth
+  * buffers, # of samples to use for each buffer, how samples
+  * are handled throughout rendering operations
+  */
+  void createRenderPass();
 };
