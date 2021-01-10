@@ -64,6 +64,9 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  //Pipeline layout
+  vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
+
   for(auto imgview: swapchain_imgviews_){
     vkDestroyImageView(logical_device_, imgview, nullptr);
   }
@@ -674,6 +677,133 @@ void VulkanApp::createGraphicsPipeline(){
   vkDestroyShaderModule(logical_device_, frag_shader_module, nullptr);
 
   // TODO: Use shader create infos to create the shader later
+
+  // Describes format of vertex data. Can be vertex-wise or instance-wise
+  VkPipelineVertexInputStateCreateInfo vertex_ci{};
+  vertex_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+  vertex_ci.vertexBindingDescriptionCount = 0;
+  vertex_ci.pVertexBindingDescriptions = nullptr;
+  vertex_ci.vertexAttributeDescriptionCount = 0;
+  vertex_ci.pVertexAttributeDescriptions = nullptr;
+
+  VkPipelineInputAssemblyStateCreateInfo input_assembly_ci{};
+  
+  // Describe How vertex data is arranged
+  input_assembly_ci.sType = 
+    VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+  input_assembly_ci.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+  input_assembly_ci.primitiveRestartEnable = VK_FALSE;
+
+  // The region of the frame buffer to draw on
+  VkViewport viewport{};
+  // Top left corner
+  viewport.x = 0.0f;
+  viewport.y = 0.0f;
+  // Width and height
+  viewport.width = (float) swapchain_img_extent_.width;
+  viewport.height = (float) swapchain_img_extent_.height;
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
+
+  // Scissor rectancle effectively clips in the rectangle
+  VkRect2D scissor{};
+  scissor.offset = {0,0};
+  scissor.extent = swapchain_img_extent_;
+
+  // Combine viewport and scissor in a struct
+  VkPipelineViewportStateCreateInfo viewport_state_ci{};
+  viewport_state_ci.sType = 
+    VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+  viewport_state_ci.viewportCount = 1;
+  viewport_state_ci.pViewports = &viewport;
+  viewport_state_ci.scissorCount = 1;
+  viewport_state_ci.pScissors = &scissor;
+
+  //Rasterizer
+  VkPipelineRasterizationStateCreateInfo rasterizer{};
+  rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  rasterizer.depthClampEnable = VK_FALSE;
+
+  // If true, geometry doesn't pass through rasterizer. no visual output.
+  rasterizer.rasterizerDiscardEnable = VK_FALSE;
+
+  rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+  rasterizer.lineWidth = 1.0f;
+
+  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+
+  // Possible to add a constant to depth values for shadow mapping
+  rasterizer.depthBiasEnable = VK_FALSE;
+  rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+  rasterizer.depthBiasClamp = 0.0f; // Optional
+  rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+
+  VkPipelineMultisampleStateCreateInfo multisampling{};
+  multisampling.sType = 
+    VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisampling.sampleShadingEnable = VK_FALSE;
+  multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisampling.minSampleShading = 1.0f; // Optional
+  multisampling.pSampleMask = nullptr; // optional
+  multisampling.alphaToCoverageEnable = VK_FALSE; // optional
+  multisampling.alphaToOneEnable = VK_FALSE; // optional
+
+  // Depth/stencil buffers don't have one right now.
+  //VkPipelineDepthStencilStateCreateInfo depthstencil{};
+
+  VkPipelineColorBlendAttachmentState colorblend_attach{};
+  colorblend_attach.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
+    VK_COLOR_COMPONENT_G_BIT | 
+    VK_COLOR_COMPONENT_B_BIT |
+    VK_COLOR_COMPONENT_A_BIT;
+
+  colorblend_attach.blendEnable = VK_FALSE;
+  colorblend_attach.srcColorBlendFactor = VK_BLEND_FACTOR_ONE; //optional
+  colorblend_attach.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
+  colorblend_attach.colorBlendOp = VK_BLEND_OP_ADD;              // Optional
+  colorblend_attach.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;   // Optional
+  colorblend_attach.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
+  colorblend_attach.alphaBlendOp = VK_BLEND_OP_ADD;              // Optional
+
+  // Define constants for color blending procedure
+  VkPipelineColorBlendStateCreateInfo colorBlending{};
+  colorBlending.sType = 
+  VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+  colorBlending.logicOpEnable = VK_FALSE;
+  colorBlending.logicOp = VK_LOGIC_OP_COPY; // Optional
+  colorBlending.attachmentCount = 1;
+  colorBlending.pAttachments = &colorblend_attach;
+  colorBlending.blendConstants[0] = 0.0f; // Optional
+  colorBlending.blendConstants[1] = 0.0f; // Optional
+  colorBlending.blendConstants[2] = 0.0f; // Optional
+  colorBlending.blendConstants[3] = 0.0f; // Optional
+
+  VkDynamicState dynamic_states[]={
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_LINE_WIDTH
+  };
+
+  // Some configs can be changed at runtime, put them here if you want.
+  VkPipelineDynamicStateCreateInfo dynamic_state_ci{};
+  dynamic_state_ci.sType =
+    VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+  dynamic_state_ci.dynamicStateCount = 2;
+  dynamic_state_ci.pDynamicStates = dynamic_states;
+
+  // Required to create this struct even if we don't need one now.
+  VkPipelineLayoutCreateInfo pipeline_layout_ci{};
+  pipeline_layout_ci.sType =
+    VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipeline_layout_ci.setLayoutCount = 0;
+  pipeline_layout_ci.pSetLayouts = nullptr;
+  pipeline_layout_ci.pushConstantRangeCount = 0;
+  pipeline_layout_ci.pPushConstantRanges = nullptr;
+
+  if(vkCreatePipelineLayout(logical_device_, &pipeline_layout_ci, nullptr,
+    &pipeline_layout_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create pipeline layout");
+  }
 }
 
 std::vector<char> VulkanApp::readFile(const std::string& filename){
@@ -686,7 +816,6 @@ std::vector<char> VulkanApp::readFile(const std::string& filename){
   }
 
   size_t file_size = (size_t) file.tellg();
-  std::cout << "shader file size:" << file_size << std::endl;
   std::vector<char> buffer(file_size);
 
   // Back to beginning

@@ -60,6 +60,9 @@ class VulkanApp {
 
   std::vector<VkImageView> swapchain_imgviews_;
 
+  // Commonly used to pass transformation matrices to vertex shader
+  VkPipelineLayout pipeline_layout_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
