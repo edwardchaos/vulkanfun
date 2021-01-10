@@ -67,6 +67,8 @@ class VulkanApp {
 
   std::vector<VkFramebuffer> swapchain_frame_buffers_;
 
+  VkCommandPool command_pool_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -193,5 +195,12 @@ class VulkanApp {
   */
   void createRenderPass();
 
+  /* Wraps image views in the swap chain for rendering.
+  */
   void createFrameBuffers();
+
+  /* Handles memory used to store command buffers. Command buffers
+  * are allocated by the command pool.
+  */
+  void createCommandPool();
 };
