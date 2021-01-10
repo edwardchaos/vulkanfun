@@ -28,6 +28,7 @@ class VulkanApp {
   void run();
 
  private:
+  const int MAX_FRAMES_IN_FLIGHT = 2;
   GLFWwindow* window_;
   const uint32_t WIDTH = 800;
   const uint32_t HEIGHT = 600;

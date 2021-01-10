@@ -67,6 +67,8 @@ void VulkanApp::mainLoop() {
     glfwPollEvents();
     drawFrame();
   }
+
+  vkDeviceWaitIdle(logical_device_);
 }
 
 void VulkanApp::cleanUp() {
@@ -1102,6 +1104,21 @@ void VulkanApp::drawFrame(){
     !=VK_SUCCESS){
     throw std::runtime_error("Failed to submit draw command buffer");
   }
+
+  // Submit back to swap chain
+  VkPresentInfoKHR present_info{};
+  present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  present_info.waitSemaphoreCount = 1;
+  present_info.pWaitSemaphores = signal_sem;
+
+  VkSwapchainKHR swap_chains[]={swap_chain_};
+  present_info.swapchainCount = 1;
+  present_info.pSwapchains = swap_chains;
+  present_info.pImageIndices = &img_idx;
+  present_info.pResults = nullptr; // Optional
+
+  vkQueuePresentKHR(present_queue_,&present_info);
+  vkQueueWaitIdle(present_queue_);
 }
 
 void VulkanApp::createSemaphores(){
