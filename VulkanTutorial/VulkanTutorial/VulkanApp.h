@@ -65,9 +65,13 @@ class VulkanApp {
   VkPipelineLayout pipeline_layout_;
   VkPipeline graphics_pipeline_;
 
+  // One for each image in swap chain
   std::vector<VkFramebuffer> swapchain_frame_buffers_;
 
   VkCommandPool command_pool_;
+
+  // One for each frame buffer
+  std::vector<VkCommandBuffer> command_buffers_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -203,4 +207,9 @@ class VulkanApp {
   * are allocated by the command pool.
   */
   void createCommandPool();
+
+  /* Allocate command buffers from the command pool, one for each
+  * frame buffer.
+  */
+  void createCommandBuffers();
 };

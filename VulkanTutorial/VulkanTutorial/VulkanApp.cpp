@@ -58,6 +58,7 @@ void VulkanApp::initVulkan() {
   createGraphicsPipeline();
   createFrameBuffers();
   createCommandPool();
+  createCommandBuffers();
 }
 
 void VulkanApp::mainLoop() {
@@ -982,5 +983,24 @@ void VulkanApp::createCommandPool(){
   if(vkCreateCommandPool(logical_device_, &cp_ci, nullptr, &command_pool_) !=
     VK_SUCCESS){
     throw std::runtime_error("Failed to create command queue");
+  }
+}
+
+void VulkanApp::createCommandBuffers(){
+  command_buffers_.resize(swapchain_frame_buffers_.size());
+
+  VkCommandBufferAllocateInfo cb_alloc_info{};
+  cb_alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  cb_alloc_info.commandPool = command_pool_;
+
+  // Primary level can be submitted to queue but not called from other
+  // command buffers. Secondary cannot be submitted to queue, but can be called
+  // from primary command buffers.
+  cb_alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  cb_alloc_info.commandBufferCount = (uint32_t)command_buffers_.size();
+
+  if(vkAllocateCommandBuffers(logical_device_, &cb_alloc_info,
+    command_buffers_.data()) != VK_SUCCESS){
+    throw std::runtime_error("Failed to allocate command buffers");
   }
 }
