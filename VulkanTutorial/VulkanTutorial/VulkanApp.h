@@ -65,6 +65,8 @@ class VulkanApp {
   VkPipelineLayout pipeline_layout_;
   VkPipeline graphics_pipeline_;
 
+  std::vector<VkFramebuffer> swapchain_frame_buffers_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -190,4 +192,6 @@ class VulkanApp {
   * are handled throughout rendering operations
   */
   void createRenderPass();
+
+  void createFrameBuffers();
 };

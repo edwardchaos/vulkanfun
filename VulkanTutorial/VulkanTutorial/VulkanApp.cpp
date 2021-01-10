@@ -56,6 +56,7 @@ void VulkanApp::initVulkan() {
   createImageViews();
   createRenderPass();
   createGraphicsPipeline();
+  createFrameBuffers();
 }
 
 void VulkanApp::mainLoop() {
@@ -67,6 +68,10 @@ void VulkanApp::mainLoop() {
 void VulkanApp::cleanUp() {
   vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
   vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
+
+  for(auto framebuffer : swapchain_frame_buffers_){
+    vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
+  }
   vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
 
   for(auto imgview: swapchain_imgviews_){
@@ -933,4 +938,32 @@ void VulkanApp::createRenderPass(){
     != VK_SUCCESS){
     throw std::runtime_error("Failed to create render pass");
   }
+}
+
+void VulkanApp::createFrameBuffers(){
+  // Create one frame buffer per image view in the swap chain
+  swapchain_frame_buffers_.resize(swapchain_imgviews_.size());
+
+  for(size_t i = 0; i < swapchain_imgviews_.size(); ++i){
+    VkImageView attachments[]={
+      swapchain_imgviews_[i]
+    };
+
+    VkFramebufferCreateInfo fb_ci{};
+    fb_ci.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+    // Renderpass needs to be compatible with this frame buffer
+    // i.e. roughly same number and type of attachments
+    fb_ci.renderPass = render_pass_;
+    fb_ci.attachmentCount = 1;
+    fb_ci.pAttachments = attachments;
+    fb_ci.width = swapchain_img_extent_.width;
+    fb_ci.height = swapchain_img_extent_.height;
+    fb_ci.layers = 1; // # of layers in img arrays
+
+    if(vkCreateFramebuffer(logical_device_, &fb_ci, nullptr,
+      &swapchain_frame_buffers_[i]) != VK_SUCCESS){
+      throw std::runtime_error("Failed to create framebuffer.");
+    }
+  }
+
 }
