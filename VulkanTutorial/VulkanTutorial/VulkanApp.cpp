@@ -59,15 +59,19 @@ void VulkanApp::initVulkan() {
   createFrameBuffers();
   createCommandPool();
   createCommandBuffers();
+  createSemaphores();
 }
 
 void VulkanApp::mainLoop() {
   while (!glfwWindowShouldClose(window_)) {
     glfwPollEvents();
+    drawFrame();
   }
 }
 
 void VulkanApp::cleanUp() {
+  vkDestroySemaphore(logical_device_, img_available_sem_, nullptr);
+  vkDestroySemaphore(logical_device_, render_finish_sem_, nullptr);
   vkDestroyCommandPool(logical_device_, command_pool_, nullptr);
   vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
   vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
@@ -891,12 +895,12 @@ VkShaderModule VulkanApp::createShaderModule(
 void VulkanApp::createRenderPass(){
   VkAttachmentDescription color_attachment{};
 
-  // Sigle color buffer
+  // Single color buffer
   color_attachment.format = swapchain_img_format_;
   color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
 
-  // What to do with data in attachment before and after rendering,
-  // applies to color and depth data, not stencil data.
+  // What to do with data in attachment before and after rendering.
+  // Applies to color and depth data, not stencil data.
 
   // Clear the values to a constant at the start (we'll clear to black)
   color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -936,6 +940,28 @@ void VulkanApp::createRenderPass(){
   rp_ci.pAttachments = &color_attachment;
   rp_ci.subpassCount = 1;
   rp_ci.pSubpasses = &subpass_desc;
+
+  /* Subpass transitions are controlled by dependencies.
+  * We have a single subpass, operations before and after count as 2 implicit
+  * subpasses.
+  */
+  VkSubpassDependency subpass_dependency{};
+  subpass_dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+  subpass_dependency.dstSubpass = 0; // Our subpass
+  // Wait till the implicit subpass before ours has the color attachment bit set
+  subpass_dependency.srcStageMask =
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  subpass_dependency.srcAccessMask = 0;
+
+  // The operations that should wait for the color output bit in the next subpass
+  // are writing color.
+  subpass_dependency.dstStageMask =
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+  subpass_dependency.dstAccessMask = 
+    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+  
+  rp_ci.dependencyCount = 1;
+  rp_ci.pDependencies = &subpass_dependency;
 
   if(vkCreateRenderPass(logical_device_, &rp_ci, nullptr, &render_pass_)
     != VK_SUCCESS){
@@ -1042,5 +1068,50 @@ void VulkanApp::createCommandBuffers(){
     if(vkEndCommandBuffer(command_buffers_[i])!=VK_SUCCESS){
       throw std::runtime_error("Failed to record command buffer");
     }
+  }
+}
+
+void VulkanApp::drawFrame(){
+  uint32_t img_idx;
+  // Acquire image from swap chain
+  vkAcquireNextImageKHR(logical_device_, swap_chain_, UINT64_MAX,
+    img_available_sem_, VK_NULL_HANDLE, &img_idx);
+
+  // Submit command to command buffer
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+  // Idx of wait_semaphores correspond to wait_stages.
+  VkSemaphore wait_semaphores[] = {img_available_sem_};
+  VkPipelineStageFlags wait_stages[] = {
+  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+
+  submit_info.waitSemaphoreCount = 1;
+  submit_info.pWaitSemaphores = wait_semaphores;
+  submit_info.pWaitDstStageMask = wait_stages;
+
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &command_buffers_[img_idx];
+
+  // Which semaphore to signal once operation is complete
+  VkSemaphore signal_sem[] = {render_finish_sem_};
+  submit_info.signalSemaphoreCount = 1;
+  submit_info.pSignalSemaphores = signal_sem;
+
+  if(vkQueueSubmit(graphics_queue_, 1, &submit_info, VK_NULL_HANDLE)
+    !=VK_SUCCESS){
+    throw std::runtime_error("Failed to submit draw command buffer");
+  }
+}
+
+void VulkanApp::createSemaphores(){
+  VkSemaphoreCreateInfo sem_info{};
+  sem_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+  if(vkCreateSemaphore(logical_device_, &sem_info, nullptr,
+    &img_available_sem_) != VK_SUCCESS
+    || vkCreateSemaphore(logical_device_, &sem_info, nullptr,
+    &render_finish_sem_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create semaphores");
   }
 }

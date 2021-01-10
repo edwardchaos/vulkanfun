@@ -73,6 +73,9 @@ class VulkanApp {
   // One for each frame buffer
   std::vector<VkCommandBuffer> command_buffers_;
 
+  VkSemaphore img_available_sem_;
+  VkSemaphore render_finish_sem_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -212,4 +215,20 @@ class VulkanApp {
   * frame buffer.
   */
   void createCommandBuffers();
+
+  /*
+  * Uses everything above to draw something on screen.
+  * Acquire image from swapchain,
+  * Execute command buffer with that image as attachment in frame buffer
+  * return image to swap chain for presentation.
+  * 
+  * These steps are called asynchronously by 1 function each. The function
+  * may return before the command is completed. Subsequent commands require
+  * preceeding ones to finish. Therefore we need synchronization. Use semaphores.
+  */
+  void drawFrame();
+
+  /* Initialize semaphores for synchronizing drawing.
+  */
+  void createSemaphores();
 };
