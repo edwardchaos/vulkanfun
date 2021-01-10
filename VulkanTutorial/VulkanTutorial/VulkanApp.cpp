@@ -59,7 +59,7 @@ void VulkanApp::initVulkan() {
   createFrameBuffers();
   createCommandPool();
   createCommandBuffers();
-  createSemaphores();
+  createSyncObjects();
 }
 
 void VulkanApp::mainLoop() {
@@ -72,8 +72,11 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
-  vkDestroySemaphore(logical_device_, img_available_sem_, nullptr);
-  vkDestroySemaphore(logical_device_, render_finish_sem_, nullptr);
+  for(size_t i = 0; i < img_available_sems_.size(); ++i){
+    vkDestroySemaphore(logical_device_, img_available_sems_[i], nullptr);
+    vkDestroySemaphore(logical_device_, render_finish_sems_[i], nullptr);
+    vkDestroyFence(logical_device_, inflight_fences_[i], nullptr);
+  }
   vkDestroyCommandPool(logical_device_, command_pool_, nullptr);
   vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
   vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
@@ -1074,17 +1077,29 @@ void VulkanApp::createCommandBuffers(){
 }
 
 void VulkanApp::drawFrame(){
+  vkWaitForFences(logical_device_, 1, &inflight_fences_[current_frame_],
+    VK_TRUE, UINT64_MAX);
+
   uint32_t img_idx;
   // Acquire image from swap chain
   vkAcquireNextImageKHR(logical_device_, swap_chain_, UINT64_MAX,
-    img_available_sem_, VK_NULL_HANDLE, &img_idx);
+    img_available_sems_[current_frame_], VK_NULL_HANDLE, &img_idx);
+
+  // Check if previous frame is using this img
+  if(images_in_flight_[img_idx] != VK_NULL_HANDLE){
+    vkWaitForFences(logical_device_, 1, &images_in_flight_[img_idx],
+      VK_TRUE, UINT64_MAX);
+  }
+
+  // Mark image as in use by this frame
+  images_in_flight_[img_idx] = inflight_fences_[current_frame_];
 
   // Submit command to command buffer
   VkSubmitInfo submit_info{};
   submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
   // Idx of wait_semaphores correspond to wait_stages.
-  VkSemaphore wait_semaphores[] = {img_available_sem_};
+  VkSemaphore wait_semaphores[] = {img_available_sems_[current_frame_]};
   VkPipelineStageFlags wait_stages[] = {
   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
 
@@ -1096,12 +1111,14 @@ void VulkanApp::drawFrame(){
   submit_info.pCommandBuffers = &command_buffers_[img_idx];
 
   // Which semaphore to signal once operation is complete
-  VkSemaphore signal_sem[] = {render_finish_sem_};
+  VkSemaphore signal_sem[] = {render_finish_sems_[current_frame_]};
   submit_info.signalSemaphoreCount = 1;
   submit_info.pSignalSemaphores = signal_sem;
 
-  if(vkQueueSubmit(graphics_queue_, 1, &submit_info, VK_NULL_HANDLE)
-    !=VK_SUCCESS){
+  vkResetFences(logical_device_, 1, &inflight_fences_[current_frame_]);
+  if(vkQueueSubmit(graphics_queue_, 1, &submit_info, 
+    inflight_fences_[current_frame_]) != VK_SUCCESS){
+
     throw std::runtime_error("Failed to submit draw command buffer");
   }
 
@@ -1118,17 +1135,30 @@ void VulkanApp::drawFrame(){
   present_info.pResults = nullptr; // Optional
 
   vkQueuePresentKHR(present_queue_,&present_info);
-  vkQueueWaitIdle(present_queue_);
+  current_frame_ = (current_frame_+1)%MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulkanApp::createSemaphores(){
+void VulkanApp::createSyncObjects(){
+  img_available_sems_.resize(MAX_FRAMES_IN_FLIGHT);
+  render_finish_sems_.resize(MAX_FRAMES_IN_FLIGHT);
+  inflight_fences_.resize(MAX_FRAMES_IN_FLIGHT);
+  images_in_flight_.resize(swapchain_images_.size(), VK_NULL_HANDLE);
+
   VkSemaphoreCreateInfo sem_info{};
   sem_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
-  if(vkCreateSemaphore(logical_device_, &sem_info, nullptr,
-    &img_available_sem_) != VK_SUCCESS
-    || vkCreateSemaphore(logical_device_, &sem_info, nullptr,
-    &render_finish_sem_) != VK_SUCCESS){
-    throw std::runtime_error("Failed to create semaphores");
+  VkFenceCreateInfo fence_info{};
+  fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+  for (size_t i = 0; i < img_available_sems_.size(); ++i) {
+    if (vkCreateSemaphore(logical_device_, &sem_info, nullptr,
+                          &img_available_sems_[i]) != VK_SUCCESS ||
+        vkCreateSemaphore(logical_device_, &sem_info, nullptr,
+                          &render_finish_sems_[i]) != VK_SUCCESS ||
+        vkCreateFence(logical_device_, &fence_info, nullptr, &inflight_fences_[i])
+      != VK_SUCCESS) {
+      throw std::runtime_error("Failed to create sync objects for frame");
+    }
   }
 }

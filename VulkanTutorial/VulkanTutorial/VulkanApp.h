@@ -74,8 +74,11 @@ class VulkanApp {
   // One for each frame buffer
   std::vector<VkCommandBuffer> command_buffers_;
 
-  VkSemaphore img_available_sem_;
-  VkSemaphore render_finish_sem_;
+  std::vector<VkSemaphore> img_available_sems_;
+  std::vector<VkSemaphore> render_finish_sems_;
+  std::vector<VkFence> inflight_fences_; // per frame
+  std::vector<VkFence> images_in_flight_; // per image in swap chain
+  size_t current_frame_ = 0;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -229,7 +232,9 @@ class VulkanApp {
   */
   void drawFrame();
 
-  /* Initialize semaphores for synchronizing drawing.
+  /* Initialize semaphores and fences for synchronizing drawing.
+  * Semaphores for gpu-gpu synchronization
+  * Fences for cpu-gpu sync
   */
-  void createSemaphores();
+  void createSyncObjects();
 };
