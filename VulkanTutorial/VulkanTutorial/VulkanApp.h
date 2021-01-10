@@ -63,6 +63,7 @@ class VulkanApp {
   // Commonly used to pass transformation matrices to vertex shader
   VkRenderPass render_pass_;
   VkPipelineLayout pipeline_layout_;
+  VkPipeline graphics_pipeline_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;

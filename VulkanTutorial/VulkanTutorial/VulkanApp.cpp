@@ -65,7 +65,7 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
-  //Pipeline layout
+  vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
   vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
   vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
 
@@ -675,9 +675,6 @@ void VulkanApp::createGraphicsPipeline(){
   VkPipelineShaderStageCreateInfo shader_stages[]=
   {vert_shader_ci, frag_shader_ci};
 
-  vkDestroyShaderModule(logical_device_, vert_shader_module, nullptr);
-  vkDestroyShaderModule(logical_device_, frag_shader_module, nullptr);
-
   // TODO: Use shader create infos to create the shader later
 
   // Describes format of vertex data. Can be vertex-wise or instance-wise
@@ -806,6 +803,39 @@ void VulkanApp::createGraphicsPipeline(){
     &pipeline_layout_) != VK_SUCCESS){
     throw std::runtime_error("Failed to create pipeline layout");
   }
+
+  VkGraphicsPipelineCreateInfo pipeline_ci{};
+  pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipeline_ci.stageCount = 2;
+
+  // Shader stage create infos
+  pipeline_ci.pStages = shader_stages;
+
+  // Fixed function stages
+  pipeline_ci.pVertexInputState = &vertex_ci;
+  pipeline_ci.pInputAssemblyState = &input_assembly_ci;
+  pipeline_ci.pViewportState = &viewport_state_ci;
+  pipeline_ci.pRasterizationState = &rasterizer;
+  pipeline_ci.pMultisampleState = &multisampling;
+  pipeline_ci.pDepthStencilState = nullptr;
+  pipeline_ci.pColorBlendState = &colorBlending;
+  pipeline_ci.pDynamicState = nullptr;
+
+  // Layout
+  pipeline_ci.layout = pipeline_layout_;
+  pipeline_ci.renderPass = render_pass_;
+  pipeline_ci.subpass = 0; // Index of subpass where graphics pipeline is used
+
+  pipeline_ci.basePipelineHandle = VK_NULL_HANDLE;
+  pipeline_ci.basePipelineIndex = -1;
+
+  if(vkCreateGraphicsPipelines(logical_device_, VK_NULL_HANDLE, 1, &pipeline_ci,
+    nullptr, &graphics_pipeline_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create graphics pipeline");
+  }
+
+  vkDestroyShaderModule(logical_device_, vert_shader_module, nullptr);
+  vkDestroyShaderModule(logical_device_, frag_shader_module, nullptr);
 }
 
 std::vector<char> VulkanApp::readFile(const std::string& filename){
