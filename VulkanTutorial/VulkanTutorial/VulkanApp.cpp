@@ -1003,4 +1003,44 @@ void VulkanApp::createCommandBuffers(){
     command_buffers_.data()) != VK_SUCCESS){
     throw std::runtime_error("Failed to allocate command buffers");
   }
+
+  for (size_t i = 0; i < command_buffers_.size(); ++i){
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+    // How the command buffer will be used.
+    begin_info.flags = 0; // Optional
+    begin_info.pInheritanceInfo = nullptr; // Optional
+
+    if(vkBeginCommandBuffer(command_buffers_[i], &begin_info) != VK_SUCCESS){
+      throw std::runtime_error("Failed to begin recording command buffer");
+    }
+
+    // Starting a render pass
+    VkRenderPassBeginInfo renderpass_info{};
+    renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    renderpass_info.renderPass = render_pass_;
+    renderpass_info.framebuffer = swapchain_frame_buffers_[i];
+    renderpass_info.renderArea.offset = { 0, 0 };
+    renderpass_info.renderArea.extent = swapchain_img_extent_;
+
+    VkClearValue clear_color{0.0f,0.0f,0.0f,1.0f};
+    renderpass_info.clearValueCount = 1;
+    renderpass_info.pClearValues = &clear_color;
+
+    // Start recording command to buffer, commands go to command buffer [i]
+    vkCmdBeginRenderPass(command_buffers_[i], &renderpass_info,
+      VK_SUBPASS_CONTENTS_INLINE);
+
+    // bind graphics pipeline
+    vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+      graphics_pipeline_);
+
+    // Tell it to draw a triangle
+    vkCmdDraw(command_buffers_[i], 3,1,0,0);
+    vkCmdEndRenderPass(command_buffers_[i]);
+    if(vkEndCommandBuffer(command_buffers_[i])!=VK_SUCCESS){
+      throw std::runtime_error("Failed to record command buffer");
+    }
+  }
 }
