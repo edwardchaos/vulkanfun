@@ -41,7 +41,6 @@ void VulkanApp::initWindow() {
   glfwInit();
   glfwWindowHint(GLFW_CLIENT_API,
                  GLFW_NO_API);  // don't create an opengl context
-  //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);  // can't be resizable
 
   window_ = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
   glfwSetWindowUserPointer(window_, this);
@@ -1170,6 +1169,12 @@ void VulkanApp::createSyncObjects(){
 }
 
 void VulkanApp::recreateSwapChain(){
+  int width = 0, height = 0;
+  glfwGetFramebufferSize(window_, &width, &height);
+  while(width == 0 && height == 0){
+    glfwGetFramebufferSize(window_, &width, &height);
+    glfwWaitEvents();
+  }
   vkDeviceWaitIdle(logical_device_);
   // Clean up existing objects related to the swap chain.
   cleanUpSwapChain();
