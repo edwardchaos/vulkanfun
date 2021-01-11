@@ -80,6 +80,8 @@ class VulkanApp {
   std::vector<VkFence> images_in_flight_; // per image in swap chain
   size_t current_frame_ = 0;
 
+  bool frame_buffer_resized_ = false;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -248,4 +250,12 @@ class VulkanApp {
   * swapchain images, frame buffers, etc.
   */
   void cleanUpSwapChain();
+
+  /*
+  * Set the frame buffer resized flag to true when the window changes size.
+  * Static function because glfw doesn't know how to correctly use 'this'
+  * when called from an instance of this class.
+  */
+  static void frameBufferResizeCallback(
+    GLFWwindow* window, int width, int height);
 };

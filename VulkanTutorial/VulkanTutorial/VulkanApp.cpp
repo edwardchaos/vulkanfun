@@ -41,9 +41,12 @@ void VulkanApp::initWindow() {
   glfwInit();
   glfwWindowHint(GLFW_CLIENT_API,
                  GLFW_NO_API);  // don't create an opengl context
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);  // can't be resizable
+  //glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);  // can't be resizable
 
   window_ = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+  glfwSetWindowUserPointer(window_, this);
+
+  glfwSetFramebufferSizeCallback(window_, frameBufferResizeCallback);
 }
 
 void VulkanApp::initVulkan() {
@@ -1069,8 +1072,17 @@ void VulkanApp::drawFrame(){
 
   uint32_t img_idx;
   // Acquire image from swap chain
+  VkResult acquire_result = 
   vkAcquireNextImageKHR(logical_device_, swap_chain_, UINT64_MAX,
     img_available_sems_[current_frame_], VK_NULL_HANDLE, &img_idx);
+
+  if(acquire_result == VK_ERROR_OUT_OF_DATE_KHR){
+    recreateSwapChain();
+    return;
+  }else if (acquire_result != VK_SUCCESS
+    && acquire_result != VK_SUBOPTIMAL_KHR){
+    throw std::runtime_error("Failed to acquire swapchain image.");
+  }
 
   // Check if previous frame is using this img
   if(images_in_flight_[img_idx] != VK_NULL_HANDLE){
@@ -1121,7 +1133,14 @@ void VulkanApp::drawFrame(){
   present_info.pImageIndices = &img_idx;
   present_info.pResults = nullptr; // Optional
 
-  vkQueuePresentKHR(present_queue_,&present_info);
+  VkResult pres_result = vkQueuePresentKHR(present_queue_,&present_info);
+  if(pres_result == VK_ERROR_OUT_OF_DATE_KHR
+    || pres_result == VK_SUBOPTIMAL_KHR 
+    || frame_buffer_resized_){
+    recreateSwapChain();
+  }else if(pres_result != VK_SUCCESS){
+    throw std::runtime_error("Failed to present swap chain image");
+  }
   current_frame_ = (current_frame_+1)%MAX_FRAMES_IN_FLIGHT;
 }
 
@@ -1184,4 +1203,12 @@ void VulkanApp::cleanUpSwapChain(){
 
   // Destroy swap chain before logical device
   vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
+}
+
+void VulkanApp::frameBufferResizeCallback(
+  GLFWwindow* window, int width, int height){
+
+  auto app = reinterpret_cast<VulkanApp*>(
+    glfwGetWindowUserPointer(window));
+  app->frame_buffer_resized_ = true;
 }
