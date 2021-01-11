@@ -299,4 +299,9 @@ class VulkanApp {
   */
   static void frameBufferResizeCallback(
     GLFWwindow* window, int width, int height);
+
+  /*
+  * Create vertex buffer, allocating memory for it and such.
+  */
+  void createVertexBuffer();
 };

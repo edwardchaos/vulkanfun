@@ -60,6 +60,7 @@ void VulkanApp::initVulkan() {
   createGraphicsPipeline();
   createFrameBuffers();
   createCommandPool();
+  createVertexBuffer();
   createCommandBuffers();
   createSyncObjects();
 }
@@ -74,6 +75,8 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  vkDestroyBuffer(logical_device_, vertex_buffer_, nullptr);
+
   cleanUpSwapChain();
   for(size_t i = 0; i < img_available_sems_.size(); ++i){
     vkDestroySemaphore(logical_device_, img_available_sems_[i], nullptr);
@@ -1218,4 +1221,18 @@ void VulkanApp::frameBufferResizeCallback(
   auto app = reinterpret_cast<VulkanApp*>(
     glfwGetWindowUserPointer(window));
   app->frame_buffer_resized_ = true;
+}
+
+void VulkanApp::createVertexBuffer(){
+  VkBufferCreateInfo buff_ci{};
+
+  buff_ci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  buff_ci.size = sizeof(vertices_[0]) * vertices_.size();
+  buff_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  buff_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  if(vkCreateBuffer(logical_device_, &buff_ci, nullptr,
+    &vertex_buffer_)!=VK_SUCCESS){
+    throw std::runtime_error("Failed to create vertex buffer");
+  }
 }
