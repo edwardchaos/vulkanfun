@@ -1,11 +1,44 @@
 #pragma once
 
+#include <array>
+#include <fstream>
 #include <optional>
 #include <vector>
-#include <fstream>
 
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
+
+#include <glm/glm.hpp>
+
+struct Vertex{
+  glm::vec2 pos;
+  glm::vec3 color;
+
+  static VkVertexInputBindingDescription getBindingDescription(){
+    VkVertexInputBindingDescription bd{};
+
+    bd.binding = 0;
+    bd.stride = sizeof(Vertex);
+    bd.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    return bd;
+  }
+
+  static std::array<VkVertexInputAttributeDescription,2> 
+    getAttributeDescription(){
+
+    std::array<VkVertexInputAttributeDescription,2> ads{};
+    ads[0].binding = 0; // from which binding does vertex data come from?
+    ads[0].location = 0; // location directive in vertex shader
+    ads[0].format = VK_FORMAT_R32G32_SFLOAT; // bytesize of attribute data
+    ads[0].offset = offsetof(Vertex,pos); // # bytes from start of vertex
+
+    ads[1].binding = 0;
+    ads[1].location = 1;
+    ads[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    ads[1].offset = offsetof(Vertex, color);
+    return ads;
+  }
+};
 
 struct QueueFamilyIndices{
   std::optional<uint32_t> graphics_family;
@@ -81,6 +114,14 @@ class VulkanApp {
   size_t current_frame_ = 0;
 
   bool frame_buffer_resized_ = false;
+
+  // Temporarily put vertex data here for development
+  const std::vector<Vertex> vertices = {
+    // Vertex, color
+    {{0.0f, -0.5f}, {1.0f,0.0f,0.0f}}, 
+    {{0.5f, 0.5f}, {0.0f,1.0f,0.0f}},
+    {{-0.5f, 0.5f}, {0.0f,0.0f,1.0f}}
+  };
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
