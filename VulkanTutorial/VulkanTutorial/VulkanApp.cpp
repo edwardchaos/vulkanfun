@@ -681,15 +681,17 @@ void VulkanApp::createGraphicsPipeline(){
   VkPipelineShaderStageCreateInfo shader_stages[]=
   {vert_shader_ci, frag_shader_ci};
 
-  // TODO: Use shader create infos to create the shader later
-
   // Describes format of vertex data. Can be vertex-wise or instance-wise
+  auto binding_desc = Vertex::getBindingDescription();
+  auto attribute_desc = Vertex::getAttributeDescription();
+
   VkPipelineVertexInputStateCreateInfo vertex_ci{};
   vertex_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-  vertex_ci.vertexBindingDescriptionCount = 0;
-  vertex_ci.pVertexBindingDescriptions = nullptr;
-  vertex_ci.vertexAttributeDescriptionCount = 0;
-  vertex_ci.pVertexAttributeDescriptions = nullptr;
+  vertex_ci.vertexBindingDescriptionCount = 1;
+  vertex_ci.pVertexBindingDescriptions = &binding_desc;
+  vertex_ci.vertexAttributeDescriptionCount =
+    static_cast<uint32_t>(attribute_desc.size());
+  vertex_ci.pVertexAttributeDescriptions = attribute_desc.data();
 
   VkPipelineInputAssemblyStateCreateInfo input_assembly_ci{};
   
