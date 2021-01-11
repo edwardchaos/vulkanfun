@@ -1058,12 +1058,17 @@ void VulkanApp::createCommandBuffers(){
     vkCmdBeginRenderPass(command_buffers_[i], &renderpass_info,
       VK_SUBPASS_CONTENTS_INLINE);
 
-    // bind graphics pipeline
+    // bind graphics pipeline with command buffer
     vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
       graphics_pipeline_);
 
+    VkBuffer vertex_buffers_[]={vertex_buffer_};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers_, offsets);
+
     // Tell it to draw a triangle
-    vkCmdDraw(command_buffers_[i], 3,1,0,0);
+    vkCmdDraw(
+      command_buffers_[i], static_cast<uint32_t>(vertices_.size()),1,0,0);
     vkCmdEndRenderPass(command_buffers_[i]);
     if(vkEndCommandBuffer(command_buffers_[i])!=VK_SUCCESS){
       throw std::runtime_error("Failed to record command buffer");
@@ -1255,6 +1260,16 @@ void VulkanApp::createVertexBuffer(){
 
   // Bind memory to vertex buffer
   vkBindBufferMemory(logical_device_, vertex_buffer_, vertex_buffer_memory_, 0);
+
+  void* data;
+  // Map vertex buffer memory on gpu to cpu accessible memory
+  vkMapMemory(logical_device_, vertex_buffer_memory_, 0, buff_ci.size, 0,
+    &data);
+
+  // Copy vertex data to buffer
+  memcpy(data, vertices_.data(), (size_t)buff_ci.size);
+  vkUnmapMemory(logical_device_, vertex_buffer_memory_);
+
 }
 
 uint32_t VulkanApp::findMemoryType(
