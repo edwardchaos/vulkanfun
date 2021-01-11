@@ -188,6 +188,11 @@ class VulkanApp {
   const VkSurfaceCapabilitiesKHR& capabilities);
 
   void createSwapChain();
+  /*
+  * Recreate the swap chain correctly without quick hacks to get an initial
+  * triangle demo.
+  */
+  void recreateSwapChain();
   
   // Views into images of the swap chain. These allow us to access parts
   // of the image like format, extent, color space, and drawing.
@@ -237,4 +242,10 @@ class VulkanApp {
   * Fences for cpu-gpu sync
   */
   void createSyncObjects();
+
+  /*
+  * Before recreating the swap chain, clean up current resources like
+  * swapchain images, frame buffers, etc.
+  */
+  void cleanUpSwapChain();
 };

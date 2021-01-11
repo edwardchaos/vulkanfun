@@ -72,26 +72,13 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  cleanUpSwapChain();
   for(size_t i = 0; i < img_available_sems_.size(); ++i){
     vkDestroySemaphore(logical_device_, img_available_sems_[i], nullptr);
     vkDestroySemaphore(logical_device_, render_finish_sems_[i], nullptr);
     vkDestroyFence(logical_device_, inflight_fences_[i], nullptr);
   }
   vkDestroyCommandPool(logical_device_, command_pool_, nullptr);
-  vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
-  vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
-
-  for(auto framebuffer : swapchain_frame_buffers_){
-    vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
-  }
-  vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
-
-  for(auto imgview: swapchain_imgviews_){
-    vkDestroyImageView(logical_device_, imgview, nullptr);
-  }
-
-  // Destroy swap chain before logical device
-  vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
 
   // Logical device 
   vkDestroyDevice(logical_device_, nullptr);
@@ -1161,4 +1148,40 @@ void VulkanApp::createSyncObjects(){
       throw std::runtime_error("Failed to create sync objects for frame");
     }
   }
+}
+
+void VulkanApp::recreateSwapChain(){
+  vkDeviceWaitIdle(logical_device_);
+  // Clean up existing objects related to the swap chain.
+  cleanUpSwapChain();
+
+  createSwapChain();
+  createImageViews();
+  createRenderPass();
+  createGraphicsPipeline();
+  createFrameBuffers();
+  createCommandBuffers();
+}
+
+void VulkanApp::cleanUpSwapChain(){
+  for(auto framebuffer : swapchain_frame_buffers_){
+    vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
+  }
+  
+  vkFreeCommandBuffers(
+    logical_device_,
+    command_pool_,
+    static_cast<uint32_t>(command_buffers_.size()),
+    command_buffers_.data());
+
+  vkDestroyPipeline(logical_device_, graphics_pipeline_, nullptr);
+  vkDestroyPipelineLayout(logical_device_, pipeline_layout_, nullptr);
+  vkDestroyRenderPass(logical_device_, render_pass_, nullptr);
+
+  for(auto imgview: swapchain_imgviews_){
+    vkDestroyImageView(logical_device_, imgview, nullptr);
+  }
+
+  // Destroy swap chain before logical device
+  vkDestroySwapchainKHR(logical_device_, swap_chain_, nullptr);
 }
