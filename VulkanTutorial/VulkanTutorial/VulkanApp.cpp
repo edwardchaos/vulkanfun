@@ -76,6 +76,7 @@ void VulkanApp::mainLoop() {
 
 void VulkanApp::cleanUp() {
   vkDestroyBuffer(logical_device_, vertex_buffer_, nullptr);
+  vkFreeMemory(logical_device_, vertex_buffer_memory_, nullptr);
 
   cleanUpSwapChain();
   for(size_t i = 0; i < img_available_sems_.size(); ++i){
@@ -1235,4 +1236,40 @@ void VulkanApp::createVertexBuffer(){
     &vertex_buffer_)!=VK_SUCCESS){
     throw std::runtime_error("Failed to create vertex buffer");
   }
+
+  VkMemoryRequirements mem_req;
+  vkGetBufferMemoryRequirements(logical_device_, vertex_buffer_, &mem_req);
+
+  VkMemoryAllocateInfo mem_alloc_info{};
+  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  mem_alloc_info.allocationSize = mem_req.size;
+  mem_alloc_info.memoryTypeIndex =
+    findMemoryType(mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  
+  if(vkAllocateMemory(logical_device_, &mem_alloc_info, nullptr,
+    &vertex_buffer_memory_) != VK_SUCCESS){
+
+    throw std::runtime_error("Failed to allocate vertex buffer memory");
+  }
+
+  // Bind memory to vertex buffer
+  vkBindBufferMemory(logical_device_, vertex_buffer_, vertex_buffer_memory_, 0);
+}
+
+uint32_t VulkanApp::findMemoryType(
+  uint32_t type_filter, VkMemoryPropertyFlags properties){
+  VkPhysicalDeviceMemoryProperties mem_prop;
+
+  vkGetPhysicalDeviceMemoryProperties(physical_device_, &mem_prop);
+
+  // Find memory type that's suitable for the vertex buffer
+  for(uint32_t i = 0; i < mem_prop.memoryTypeCount; ++i){
+    if((type_filter & (1<<i)) &&
+      (mem_prop.memoryTypes[i].propertyFlags & properties) == properties){
+      // Types are fixed per index
+      return i;
+    }
+  }
+  throw std::runtime_error("Failed to find suitable memory type");
 }

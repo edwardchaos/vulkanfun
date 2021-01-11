@@ -116,12 +116,15 @@ class VulkanApp {
   bool frame_buffer_resized_ = false;
 
   // Temporarily put vertex data here for development
-  const std::vector<Vertex> vertices = {
+  const std::vector<Vertex> vertices_ = {
     // Vertex, color
     {{0.0f, -0.5f}, {1.0f,0.0f,0.0f}}, 
     {{0.5f, 0.5f}, {0.0f,1.0f,0.0f}},
     {{-0.5f, 0.5f}, {0.0f,0.0f,1.0f}}
   };
+
+  VkBuffer vertex_buffer_;
+  VkDeviceMemory vertex_buffer_memory_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -304,4 +307,10 @@ class VulkanApp {
   * Create vertex buffer, allocating memory for it and such.
   */
   void createVertexBuffer();
+
+  /* Gpus have different memory types with different performance, allowed
+  * operations. Find the memory type that is available and suits our needs
+  */
+  uint32_t findMemoryType(uint32_t type_filter,
+    VkMemoryPropertyFlags properties);
 };
