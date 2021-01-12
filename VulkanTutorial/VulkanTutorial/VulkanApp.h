@@ -118,7 +118,7 @@ class VulkanApp {
   // Temporarily put vertex data here for development
   const std::vector<Vertex> vertices_ = {
     // Vertex, color
-    {{-0.5f, -0.5f}, {1.0f,1.0f,1.0f}}, 
+    {{-0.5f, -0.5f}, {1.0f,0.0f,0.0f}}, 
     {{0.5f, -0.5f}, {0.0f,1.0f,0.0f}},
     {{0.5f, 0.5f}, {0.0f,0.0f,1.0f}},
     {{-0.5f, 0.5f}, {1.0f,1.0f,1.0f}}

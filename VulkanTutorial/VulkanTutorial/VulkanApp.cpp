@@ -61,6 +61,7 @@ void VulkanApp::initVulkan() {
   createFrameBuffers();
   createCommandPool();
   createVertexBuffer();
+  createIndexBuffer();
   createCommandBuffers();
   createSyncObjects();
 }
@@ -1069,10 +1070,12 @@ void VulkanApp::createCommandBuffers(){
     VkBuffer vertex_buffers_[]={vertex_buffer_};
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers_, offsets);
+    vkCmdBindIndexBuffer(command_buffers_[i], index_buffer_, 0,
+      VK_INDEX_TYPE_UINT16);
 
     // Tell it to draw a triangle
-    vkCmdDraw(
-      command_buffers_[i], static_cast<uint32_t>(vertices_.size()),1,0,0);
+    vkCmdDrawIndexed(
+      command_buffers_[i], static_cast<uint32_t>(indices_.size()),1,0,0,0);
     vkCmdEndRenderPass(command_buffers_[i]);
     if(vkEndCommandBuffer(command_buffers_[i])!=VK_SUCCESS){
       throw std::runtime_error("Failed to record command buffer");
