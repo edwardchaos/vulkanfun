@@ -68,6 +68,7 @@ void VulkanApp::initVulkan() {
   createIndexBuffer();
   createUniformBuffers();
   createDescriptorPool();
+  createDescriptorSets();
   createCommandBuffers();
   createSyncObjects();
 }
@@ -755,7 +756,7 @@ void VulkanApp::createGraphicsPipeline(){
   rasterizer.lineWidth = 1.0f;
 
   rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 
   // Possible to add a constant to depth values for shadow mapping
   rasterizer.depthBiasEnable = VK_FALSE;
@@ -1080,7 +1081,11 @@ void VulkanApp::createCommandBuffers(){
     vkCmdBindIndexBuffer(command_buffers_[i], index_buffer_, 0,
       VK_INDEX_TYPE_UINT16);
 
-    // Tell it to draw a triangle
+    // Bind the right descriptor set
+    vkCmdBindDescriptorSets(command_buffers_[i],
+      VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_, 0, 1,
+      &descriptor_sets_[i], 0, nullptr);
+
     vkCmdDrawIndexed(
       command_buffers_[i], static_cast<uint32_t>(indices_.size()),1,0,0,0);
     vkCmdEndRenderPass(command_buffers_[i]);
@@ -1213,6 +1218,7 @@ void VulkanApp::recreateSwapChain(){
   createFrameBuffers();
   createUniformBuffers();
   createDescriptorPool();
+  createDescriptorSets();
   createCommandBuffers();
 }
 
@@ -1462,7 +1468,6 @@ void VulkanApp::updateUniformBuffer(uint32_t uniform_buffer_idx){
   // positive y downward on screen.
   ubo.proj[1][1] *= -1;
 
-  //uniform_buffers_[uniform_buffer_idx] = ubo;
   void *data;
   vkMapMemory(logical_device_, uniform_buffers_memory_[uniform_buffer_idx],
     0, sizeof(ubo), 0, &data);
@@ -1490,6 +1495,45 @@ void VulkanApp::createDescriptorPool(){
   if(vkCreateDescriptorPool(logical_device_, &dp_info, nullptr,
     &descriptor_pool_) != VK_SUCCESS){
     throw std::runtime_error("Failed to create descriptor pool");
+  }
+}
+
+void VulkanApp::createDescriptorSets(){
+  std::vector<VkDescriptorSetLayout> layouts(swapchain_images_.size(),
+    descriptor_layout_);
+
+  VkDescriptorSetAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  alloc_info.descriptorPool = descriptor_pool_;
+  alloc_info.descriptorSetCount = 
+    static_cast<uint32_t>(swapchain_images_.size());
+  alloc_info.pSetLayouts = layouts.data();
+
+  descriptor_sets_.resize(swapchain_images_.size());
+  if(vkAllocateDescriptorSets(logical_device_, &alloc_info,
+    descriptor_sets_.data()) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create descriptor sets");
+  }
+
+  // Descriptor sets created, but empty. populate them.
+  for(size_t i = 0; i < descriptor_sets_.size(); ++i){
+    VkDescriptorBufferInfo buffer_info{};
+    buffer_info.buffer = uniform_buffers_[i];
+    buffer_info.offset = 0;
+    buffer_info.range = sizeof(UniformBufferObject);
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptor_sets_[i];
+    write.dstBinding = 0;
+    write.dstArrayElement = 0; // Descriptors can be array. Use the first one.
+    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &buffer_info; // refers to buffer data
+    write.pImageInfo = nullptr; // Optional; refers to image data
+    write.pTexelBufferView = nullptr; // Optional; refers to buffer views
+    
+    vkUpdateDescriptorSets(logical_device_, 1, &write, 0, nullptr);
   }
 }
 
