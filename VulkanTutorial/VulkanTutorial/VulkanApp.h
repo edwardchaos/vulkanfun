@@ -144,6 +144,8 @@ class VulkanApp {
   std::vector<VkBuffer> uniform_buffers_;
   std::vector<VkDeviceMemory> uniform_buffers_memory_;
 
+  VkDescriptorPool descriptor_pool_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -355,6 +357,8 @@ class VulkanApp {
   /* Update information in uniform buffers
   */
   void updateUniformBuffer(uint32_t uniform_buffer_idx);
+
+  void createDescriptorPool();
 };
 
 }  // namespace va

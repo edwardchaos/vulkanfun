@@ -67,6 +67,7 @@ void VulkanApp::initVulkan() {
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
+  createDescriptorPool();
   createCommandBuffers();
   createSyncObjects();
 }
@@ -1211,6 +1212,7 @@ void VulkanApp::recreateSwapChain(){
   createGraphicsPipeline();
   createFrameBuffers();
   createUniformBuffers();
+  createDescriptorPool();
   createCommandBuffers();
 }
 
@@ -1223,6 +1225,8 @@ void VulkanApp::cleanUpSwapChain(){
     vkDestroyBuffer(logical_device_, uniform_buffers_[i], nullptr);
     vkFreeMemory(logical_device_, uniform_buffers_memory_[i], nullptr);
   }
+
+  vkDestroyDescriptorPool(logical_device_, descriptor_pool_, nullptr);
   
   vkFreeCommandBuffers(
     logical_device_,
@@ -1464,6 +1468,29 @@ void VulkanApp::updateUniformBuffer(uint32_t uniform_buffer_idx){
     0, sizeof(ubo), 0, &data);
   memcpy(data, &ubo, sizeof(ubo));
   vkUnmapMemory(logical_device_, uniform_buffers_memory_[uniform_buffer_idx]);
+}
+
+void VulkanApp::createDescriptorPool(){
+  // What types of descriptors will be contained in descriptor set
+  // How many there will be
+  VkDescriptorPoolSize dp_size{};
+
+  dp_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  // 1 for each swap chain
+  dp_size.descriptorCount = static_cast<uint32_t>(swapchain_images_.size());
+
+  VkDescriptorPoolCreateInfo dp_info{};
+  dp_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  dp_info.poolSizeCount = 1;
+  dp_info.pPoolSizes = &dp_size;
+
+  // Maximum # of descriptor sets that may be allocated
+  dp_info.maxSets = static_cast<uint32_t>(swapchain_images_.size());
+
+  if(vkCreateDescriptorPool(logical_device_, &dp_info, nullptr,
+    &descriptor_pool_) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create descriptor pool");
+  }
 }
 
 }// namespace va
