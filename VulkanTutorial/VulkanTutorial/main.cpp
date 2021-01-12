@@ -3,7 +3,7 @@
 #include "VulkanApp.h"
 
 int main() {
-  VulkanApp app;
+  va::VulkanApp app;
 
   try {
     app.run();

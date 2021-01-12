@@ -1,9 +1,12 @@
 #include "VulkanApp.h"
 
 #include <algorithm>
+#include <chrono>
 #include <iostream>
 #include <set>
 
+
+namespace va{
 VkResult VulkanApp::CreateDebugUtilsMessengerEXT(
   VkInstance instance,
   const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -57,11 +60,13 @@ void VulkanApp::initVulkan() {
   createSwapChain();
   createImageViews();
   createRenderPass();
+  createDescriptorSetLayout();
   createGraphicsPipeline();
   createFrameBuffers();
   createCommandPool();
   createVertexBuffer();
   createIndexBuffer();
+  createUniformBuffers();
   createCommandBuffers();
   createSyncObjects();
 }
@@ -77,6 +82,8 @@ void VulkanApp::mainLoop() {
 
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
+
+  vkDestroyDescriptorSetLayout(logical_device_, descriptor_layout_, nullptr);
 
   vkDestroyBuffer(logical_device_, index_buffer_, nullptr);
   vkFreeMemory(logical_device_, index_buffer_memory_, nullptr);
@@ -807,12 +814,11 @@ void VulkanApp::createGraphicsPipeline(){
   dynamic_state_ci.dynamicStateCount = 2;
   dynamic_state_ci.pDynamicStates = dynamic_states;
 
-  // Required to create this struct even if we don't need one now.
   VkPipelineLayoutCreateInfo pipeline_layout_ci{};
   pipeline_layout_ci.sType =
     VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-  pipeline_layout_ci.setLayoutCount = 0;
-  pipeline_layout_ci.pSetLayouts = nullptr;
+  pipeline_layout_ci.setLayoutCount = 1;
+  pipeline_layout_ci.pSetLayouts = &descriptor_layout_;
   pipeline_layout_ci.pushConstantRangeCount = 0;
   pipeline_layout_ci.pPushConstantRanges = nullptr;
 
@@ -1101,6 +1107,8 @@ void VulkanApp::drawFrame(){
     throw std::runtime_error("Failed to acquire swapchain image.");
   }
 
+  updateUniformBuffer(img_idx);
+
   // Check if previous frame is using this img
   if(images_in_flight_[img_idx] != VK_NULL_HANDLE){
     vkWaitForFences(logical_device_, 1, &images_in_flight_[img_idx],
@@ -1202,12 +1210,18 @@ void VulkanApp::recreateSwapChain(){
   createRenderPass();
   createGraphicsPipeline();
   createFrameBuffers();
+  createUniformBuffers();
   createCommandBuffers();
 }
 
 void VulkanApp::cleanUpSwapChain(){
   for(auto framebuffer : swapchain_frame_buffers_){
     vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
+  }
+
+  for(size_t i = 0; i < swapchain_images_.size(); ++i){
+    vkDestroyBuffer(logical_device_, uniform_buffers_[i], nullptr);
+    vkFreeMemory(logical_device_, uniform_buffers_memory_[i], nullptr);
   }
   
   vkFreeCommandBuffers(
@@ -1387,3 +1401,69 @@ void VulkanApp::createIndexBuffer(){
   vkDestroyBuffer(logical_device_, staging_buffer, nullptr);
   vkFreeMemory(logical_device_, staging_buffer_memory, nullptr);
 }
+
+void VulkanApp::createDescriptorSetLayout(){
+  VkDescriptorSetLayoutBinding ubo_layout_binding{};
+  // There can be an array of buffers, eg. one for each tf for model bones
+  ubo_layout_binding.binding = 0;
+  ubo_layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  ubo_layout_binding.descriptorCount = 1;
+
+  // Only referencing descriptor during vertex shading.
+  ubo_layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  
+  ubo_layout_binding.pImmutableSamplers = nullptr; // Optional
+
+  VkDescriptorSetLayoutCreateInfo layout_info{};
+  layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  layout_info.bindingCount = 1;
+  layout_info.pBindings = &ubo_layout_binding;
+
+  if (vkCreateDescriptorSetLayout(logical_device_, &layout_info, nullptr,
+                                  &descriptor_layout_) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create descriptor set layout");
+  }
+}
+
+void VulkanApp::createUniformBuffers(){
+  auto buff_size = sizeof(UniformBufferObject);
+
+  uniform_buffers_.resize(swapchain_images_.size());
+  uniform_buffers_memory_.resize(swapchain_images_.size());
+
+  for (size_t i = 0; i < uniform_buffers_.size(); ++i) {
+    createBuffer(buff_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                     VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                 uniform_buffers_[i], uniform_buffers_memory_[i]);
+  }
+}
+
+void VulkanApp::updateUniformBuffer(uint32_t uniform_buffer_idx){
+  static auto start_time = std::chrono::high_resolution_clock::now(); 
+
+  auto current_time = std::chrono::high_resolution_clock::now();
+  float time = std::chrono::duration<float, std::chrono::seconds::period>(
+    current_time - start_time).count();
+
+  UniformBufferObject ubo{};
+  ubo.model = glm::rotate(glm::mat4(1.0f), time*glm::radians(90.0f),
+    glm::vec3(0.0f, 0.0f, 1.0f));
+  ubo.view = glm::lookAt(glm::vec3(2.0f,2.0f,2.0f), glm::vec3(0.0f,0.0f,0.0f),
+    glm::vec3(0.0f,0.0f,1.0f));
+  // 45 deg vertical fov, 0.1 near plane, 10 far plane.
+  ubo.proj = glm::perspective(glm::radians(45.0f),
+    swapchain_img_extent_.width/(float)swapchain_img_extent_.height, 0.1f, 10.0f);
+
+  // positive y downward on screen.
+  ubo.proj[1][1] *= -1;
+
+  //uniform_buffers_[uniform_buffer_idx] = ubo;
+  void *data;
+  vkMapMemory(logical_device_, uniform_buffers_memory_[uniform_buffer_idx],
+    0, sizeof(ubo), 0, &data);
+  memcpy(data, &ubo, sizeof(ubo));
+  vkUnmapMemory(logical_device_, uniform_buffers_memory_[uniform_buffer_idx]);
+}
+
+}// namespace va

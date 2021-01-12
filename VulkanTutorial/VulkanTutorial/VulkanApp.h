@@ -8,13 +8,23 @@
 #define GLFW_INCLUDE_VULKAN
 #include "GLFW/glfw3.h"
 
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
-struct Vertex{
+namespace va {
+
+struct UniformBufferObject {
+  glm::mat4 model;
+  glm::mat4 view;
+  glm::mat4 proj;
+};
+
+struct Vertex {
   glm::vec2 pos;
   glm::vec3 color;
 
-  static VkVertexInputBindingDescription getBindingDescription(){
+  static VkVertexInputBindingDescription getBindingDescription() {
     VkVertexInputBindingDescription bd{};
 
     bd.binding = 0;
@@ -23,14 +33,13 @@ struct Vertex{
     return bd;
   }
 
-  static std::array<VkVertexInputAttributeDescription,2> 
-    getAttributeDescription(){
-
-    std::array<VkVertexInputAttributeDescription,2> ads{};
-    ads[0].binding = 0; // from which binding does vertex data come from?
-    ads[0].location = 0; // location directive in vertex shader
-    ads[0].format = VK_FORMAT_R32G32_SFLOAT; // bytesize of attribute data
-    ads[0].offset = offsetof(Vertex,pos); // # bytes from start of vertex
+  static std::array<VkVertexInputAttributeDescription, 2>
+  getAttributeDescription() {
+    std::array<VkVertexInputAttributeDescription, 2> ads{};
+    ads[0].binding = 0;   // from which binding does vertex data come from?
+    ads[0].location = 0;  // location directive in vertex shader
+    ads[0].format = VK_FORMAT_R32G32_SFLOAT;  // bytesize of attribute data
+    ads[0].offset = offsetof(Vertex, pos);    // # bytes from start of vertex
 
     ads[1].binding = 0;
     ads[1].location = 1;
@@ -40,17 +49,17 @@ struct Vertex{
   }
 };
 
-struct QueueFamilyIndices{
+struct QueueFamilyIndices {
   std::optional<uint32_t> graphics_family;
   std::optional<uint32_t> present_family;
 
-  bool isComplete(){
+  bool isComplete() {
     return graphics_family.has_value() && present_family.has_value();
   }
 };
 
 // Contain details about the swap chain to see if it's suitable.
-struct SwapChainSupportDetails{
+struct SwapChainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
   std::vector<VkSurfaceFormatKHR> formats;
   std::vector<VkPresentModeKHR> present_modes;
@@ -70,7 +79,7 @@ class VulkanApp {
   // Handle debug messages from validation layers
   VkDebugUtilsMessengerEXT debug_messenger_;
 
-  // Window system integration extension needed since vulkan is system 
+  // Window system integration extension needed since vulkan is system
   // agnostic
   VkSurfaceKHR surface_;
 
@@ -79,8 +88,7 @@ class VulkanApp {
       "VK_LAYER_KHRONOS_validation"};
 
   const std::vector<const char*> device_extensions_ = {
-    VK_KHR_SWAPCHAIN_EXTENSION_NAME
-  };
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
   VkPhysicalDevice physical_device_ = VK_NULL_HANDLE;
   VkDevice logical_device_;
@@ -96,6 +104,7 @@ class VulkanApp {
 
   // Commonly used to pass transformation matrices to vertex shader
   VkRenderPass render_pass_;
+  VkDescriptorSetLayout descriptor_layout_;
   VkPipelineLayout pipeline_layout_;
   VkPipeline graphics_pipeline_;
 
@@ -109,31 +118,31 @@ class VulkanApp {
 
   std::vector<VkSemaphore> img_available_sems_;
   std::vector<VkSemaphore> render_finish_sems_;
-  std::vector<VkFence> inflight_fences_; // per frame
-  std::vector<VkFence> images_in_flight_; // per image in swap chain
+  std::vector<VkFence> inflight_fences_;   // per frame
+  std::vector<VkFence> images_in_flight_;  // per image in swap chain
   size_t current_frame_ = 0;
 
   bool frame_buffer_resized_ = false;
 
   // Temporarily put vertex data here for development
   const std::vector<Vertex> vertices_ = {
-    // Vertex, color
-    {{-0.5f, -0.5f}, {1.0f,0.0f,0.0f}}, 
-    {{0.5f, -0.5f}, {0.0f,1.0f,0.0f}},
-    {{0.5f, 0.5f}, {0.0f,0.0f,1.0f}},
-    {{-0.5f, 0.5f}, {1.0f,1.0f,1.0f}}
-  };
+      // Vertex, color
+      {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
 
-  //Vertex indices outlining a rectangle formed by 2 triangles
-  const std::vector<uint16_t> indices_ = {
-    0,1,2,2,3,0
-  };
+  // Vertex indices outlining a rectangle formed by 2 triangles
+  const std::vector<uint16_t> indices_ = {0, 1, 2, 2, 3, 0};
 
   VkBuffer vertex_buffer_;
   VkDeviceMemory vertex_buffer_memory_;
 
   VkBuffer index_buffer_;
   VkDeviceMemory index_buffer_memory_;
+
+  std::vector<VkBuffer> uniform_buffers_;
+  std::vector<VkDeviceMemory> uniform_buffers_memory_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -149,7 +158,7 @@ class VulkanApp {
 
   // Main loop for drawing
   void mainLoop();
-  
+
   void cleanUp();
 
   // Create vulkan instance, called in initVulkan
@@ -164,9 +173,9 @@ class VulkanApp {
 
   // Populates the struct for creating a debug messenger
   void populateDebugMessengerCreateInfo(
-    VkDebugUtilsMessengerCreateInfoEXT& createInfo);
+      VkDebugUtilsMessengerCreateInfoEXT& createInfo);
 
-  // Setup debug messenger to call our callback instead of just putting 
+  // Setup debug messenger to call our callback instead of just putting
   // everything on stdout
   void setupDebugMessenger();
 
@@ -178,8 +187,8 @@ class VulkanApp {
                 void* pUserData);
 
   /* Extension functions are not loaded by default, we need to look up its
-  * address ourselves with this wrapper
-  */
+   * address ourselves with this wrapper
+   */
   static VkResult CreateDebugUtilsMessengerEXT(
       VkInstance instance,
       const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo,
@@ -187,7 +196,7 @@ class VulkanApp {
       VkDebugUtilsMessengerEXT* pDebugMessenger);
 
   /* Also load the clean up code for the debug utils extension
-  */
+   */
   static void DestroyDebugUtilsMessengerEXT(
       VkInstance instance, VkDebugUtilsMessengerEXT debugMessenger,
       const VkAllocationCallbacks* pAllocator);
@@ -196,144 +205,156 @@ class VulkanApp {
   void pickPhysicalDevice();
 
   /*
-  * Check device if it supports the operations we need
-  */
+   * Check device if it supports the operations we need
+   */
   bool isDeviceSuitable(VkPhysicalDevice device);
 
   /*
-  * Finds queue families of the device and returns an index to 
-  * a queue family that supports at minimum vk_queue_graphics_bit.
-  * 
-  * If no queue families of the device support the minimum requirement,
-  * the returned indices is not complete.
-  * 
-  * eg.
-  * auto indices = findQueueFamilies(device);
-  * if(indices.isComplete()) // A valid queue family exists for this device.
-  */
+   * Finds queue families of the device and returns an index to
+   * a queue family that supports at minimum vk_queue_graphics_bit.
+   *
+   * If no queue families of the device support the minimum requirement,
+   * the returned indices is not complete.
+   *
+   * eg.
+   * auto indices = findQueueFamilies(device);
+   * if(indices.isComplete()) // A valid queue family exists for this device.
+   */
   QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
 
   /*
-  * After selecting a physical device, the logical device is created to
-  * interface with the physical one.
-  * 
-  */
+   * After selecting a physical device, the logical device is created to
+   * interface with the physical one.
+   *
+   */
   void createLogicalDevice();
 
   /*
-  * Create platform specific surface for displaying things on screen.
-  */
+   * Create platform specific surface for displaying things on screen.
+   */
   void createSurface();
 
   /* Check that the device supports things like swap chain for presenting
-  */
+   */
   bool checkDeviceExtensionSupport(VkPhysicalDevice device);
 
-  SwapChainSupportDetails
-  querySwapChainSupport(VkPhysicalDevice device);
+  SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
 
   VkSurfaceFormatKHR chooseSwapSurfaceFormat(
-  const std::vector<VkSurfaceFormatKHR> &available_formats);
+      const std::vector<VkSurfaceFormatKHR>& available_formats);
 
   VkPresentModeKHR chooseSwapPresentMode(
-  const std::vector<VkPresentModeKHR> &available_present_modes);
+      const std::vector<VkPresentModeKHR>& available_present_modes);
 
   // Resolution of the swap chain images
-  VkExtent2D chooseSwapExtent(
-  const VkSurfaceCapabilitiesKHR& capabilities);
+  VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
 
   void createSwapChain();
   /*
-  * Recreate the swap chain correctly without quick hacks to get an initial
-  * triangle demo.
-  */
+   * Recreate the swap chain correctly without quick hacks to get an initial
+   * triangle demo.
+   */
   void recreateSwapChain();
-  
+
   // Views into images of the swap chain. These allow us to access parts
   // of the image like format, extent, color space, and drawing.
   void createImageViews();
 
   void createGraphicsPipeline();
 
-  static std::vector<char> readFile(const std::string& filename); 
+  static std::vector<char> readFile(const std::string& filename);
 
-  VkShaderModule createShaderModule(
-    const std::vector<char> &shader_bytecode);
+  VkShaderModule createShaderModule(const std::vector<char>& shader_bytecode);
 
   /* Tell vulkan about framebuffer attachments, # of color and depth
-  * buffers, # of samples to use for each buffer, how samples
-  * are handled throughout rendering operations
-  */
+   * buffers, # of samples to use for each buffer, how samples
+   * are handled throughout rendering operations
+   */
   void createRenderPass();
 
   /* Wraps image views in the swap chain for rendering.
-  */
+   */
   void createFrameBuffers();
 
   /* Handles memory used to store command buffers. Command buffers
-  * are allocated by the command pool.
-  */
+   * are allocated by the command pool.
+   */
   void createCommandPool();
 
   /* Allocate command buffers from the command pool, one for each
-  * frame buffer.
-  */
+   * frame buffer.
+   */
   void createCommandBuffers();
 
   /*
-  * Uses everything above to draw something on screen.
-  * Acquire image from swapchain,
-  * Execute command buffer with that image as attachment in frame buffer
-  * return image to swap chain for presentation.
-  * 
-  * These steps are called asynchronously by 1 function each. The function
-  * may return before the command is completed. Subsequent commands require
-  * preceeding ones to finish. Therefore we need synchronization. Use semaphores.
-  */
+   * Uses everything above to draw something on screen.
+   * Acquire image from swapchain,
+   * Execute command buffer with that image as attachment in frame buffer
+   * return image to swap chain for presentation.
+   *
+   * These steps are called asynchronously by 1 function each. The function
+   * may return before the command is completed. Subsequent commands require
+   * preceeding ones to finish. Therefore we need synchronization. Use
+   * semaphores.
+   */
   void drawFrame();
 
   /* Initialize semaphores and fences for synchronizing drawing.
-  * Semaphores for gpu-gpu synchronization
-  * Fences for cpu-gpu sync
-  */
+   * Semaphores for gpu-gpu synchronization
+   * Fences for cpu-gpu sync
+   */
   void createSyncObjects();
 
   /*
-  * Before recreating the swap chain, clean up current resources like
-  * swapchain images, frame buffers, etc.
-  */
+   * Before recreating the swap chain, clean up current resources like
+   * swapchain images, frame buffers, etc.
+   */
   void cleanUpSwapChain();
 
   /*
-  * Set the frame buffer resized flag to true when the window changes size.
-  * Static function because glfw doesn't know how to correctly use 'this'
-  * when called from an instance of this class.
-  */
-  static void frameBufferResizeCallback(
-    GLFWwindow* window, int width, int height);
+   * Set the frame buffer resized flag to true when the window changes size.
+   * Static function because glfw doesn't know how to correctly use 'this'
+   * when called from an instance of this class.
+   */
+  static void frameBufferResizeCallback(GLFWwindow* window, int width,
+                                        int height);
 
   /*
-  * Create vertex buffer, allocating memory for it and such.
-  */
+   * Create vertex buffer, allocating memory for it and such.
+   */
   void createVertexBuffer();
 
   /* Gpus have different memory types with different performance, allowed
-  * operations. Find the memory type that is available and suits our needs
-  */
+   * operations. Find the memory type that is available and suits our needs
+   */
   uint32_t findMemoryType(uint32_t type_filter,
-    VkMemoryPropertyFlags properties);
+                          VkMemoryPropertyFlags properties);
 
   /* Helper function to create buffers
-  */
+   */
   void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage_flags,
-    VkMemoryPropertyFlags mem_prop_flags, VkBuffer& buffer,
-    VkDeviceMemory &buffer_memory);
+                    VkMemoryPropertyFlags mem_prop_flags, VkBuffer& buffer,
+                    VkDeviceMemory& buffer_memory);
 
-  void copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
-    VkDeviceSize size);
-  
+  void copyBuffer(VkBuffer src_buff, VkBuffer dst_buff, VkDeviceSize size);
+
   /* Create the index buffer that indicates which vertices to use
-  * from the vertex buffer and in what order.
-  */
+   * from the vertex buffer and in what order.
+   */
   void createIndexBuffer();
+
+  /* Create details about descriptor layout used in shaders
+   * Descriptor sets is how we pass global information to shaders
+   */
+  void createDescriptorSetLayout();
+
+  /* Create uniform buffers, 1 for each swap chain image.
+   */
+  void createUniformBuffers();
+
+  /* Update information in uniform buffers
+  */
+  void updateUniformBuffer(uint32_t uniform_buffer_idx);
 };
+
+}  // namespace va
