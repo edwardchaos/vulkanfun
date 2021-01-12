@@ -319,4 +319,7 @@ class VulkanApp {
   void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage_flags,
     VkMemoryPropertyFlags mem_prop_flags, VkBuffer& buffer,
     VkDeviceMemory &buffer_memory);
+
+  void copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
+    VkDeviceSize size);
 };

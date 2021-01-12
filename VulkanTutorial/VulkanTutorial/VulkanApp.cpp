@@ -1231,19 +1231,34 @@ void VulkanApp::frameBufferResizeCallback(
 
 void VulkanApp::createVertexBuffer(){
   auto buff_size = sizeof(vertices_[0]) * vertices_.size();
-  createBuffer(buff_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+
+  // Create staging buffers for CPU side visiblity and a GPU buffer then
+  // transfer data from staging to GPU.
+  VkBuffer staging_buffer;
+  VkDeviceMemory staging_buffer_memory;
+  createBuffer(buff_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-    vertex_buffer_, vertex_buffer_memory_);
+    staging_buffer, staging_buffer_memory);
 
   void* data;
   // Map vertex buffer memory on gpu to cpu accessible memory
-  vkMapMemory(logical_device_, vertex_buffer_memory_, 0, buff_size, 0,
-    &data);
+  vkMapMemory(logical_device_, staging_buffer_memory, 0, buff_size, 0, &data);
 
   // Copy vertex data to buffer
   memcpy(data, vertices_.data(), (size_t)buff_size);
-  vkUnmapMemory(logical_device_, vertex_buffer_memory_);
+  vkUnmapMemory(logical_device_, staging_buffer_memory);
 
+  // Vertex buffer local on the GPU. cannot use vkMapMemory on device memory
+  createBuffer(buff_size,
+    VK_BUFFER_USAGE_VERTEX_BUFFER_BIT|VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    vertex_buffer_, vertex_buffer_memory_);
+
+  copyBuffer(staging_buffer, vertex_buffer_, buff_size);
+
+  // clean up staging buffer
+  vkDestroyBuffer(logical_device_, staging_buffer, nullptr);
+  vkFreeMemory(logical_device_, staging_buffer_memory, nullptr);
 }
 
 uint32_t VulkanApp::findMemoryType(
@@ -1292,4 +1307,51 @@ void VulkanApp::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage_flags,
 
   // Bind memory to vertex buffer
   vkBindBufferMemory(logical_device_, buffer, buffer_memory, 0);
+}
+
+void VulkanApp::copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
+    VkDeviceSize size){
+  // Data transfer between memory buffers go through command buffers.
+  // Create transient command pool for this purpose.
+
+  VkCommandBufferAllocateInfo alloc_info{};
+  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  alloc_info.commandPool = command_pool_;
+  alloc_info.commandBufferCount = 1;
+
+  VkCommandBuffer command_buffer;
+  vkAllocateCommandBuffers(logical_device_, &alloc_info, &command_buffer);
+
+  // Start record of transfer operation on command buffer
+  VkCommandBufferBeginInfo begin_info{};
+
+  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkBeginCommandBuffer(command_buffer, &begin_info);
+
+  VkBufferCopy copy_region{};
+  copy_region.srcOffset = 0;
+  copy_region.dstOffset = 0;
+  copy_region.size = size;
+  vkCmdCopyBuffer(command_buffer, src_buff, dst_buff, 1, &copy_region);
+
+  // Finish recording command
+  vkEndCommandBuffer(command_buffer);
+
+  // Execute command immediately to do the transfer
+  VkSubmitInfo submit_info{};
+  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submit_info.commandBufferCount = 1;
+  submit_info.pCommandBuffers = &command_buffer;
+
+  // By default, graphics queue supports transfer operations.
+  // No explicit transfer queue is necessary.
+  vkQueueSubmit(graphics_queue_, 1, &submit_info, VK_NULL_HANDLE);
+
+  // Could use a fence and use vkWaitForFences, or wait for queue to become idle
+  vkQueueWaitIdle(graphics_queue_);
+
+  vkFreeCommandBuffers(logical_device_, command_pool_, 1, &command_buffer);
 }
