@@ -118,13 +118,22 @@ class VulkanApp {
   // Temporarily put vertex data here for development
   const std::vector<Vertex> vertices_ = {
     // Vertex, color
-    {{0.0f, -0.5f}, {1.0f,1.0f,1.0f}}, 
-    {{0.5f, 0.5f}, {0.0f,1.0f,0.0f}},
-    {{-0.5f, 0.5f}, {0.0f,0.0f,1.0f}}
+    {{-0.5f, -0.5f}, {1.0f,1.0f,1.0f}}, 
+    {{0.5f, -0.5f}, {0.0f,1.0f,0.0f}},
+    {{0.5f, 0.5f}, {0.0f,0.0f,1.0f}},
+    {{-0.5f, 0.5f}, {1.0f,1.0f,1.0f}}
+  };
+
+  //Vertex indices outlining a rectangle formed by 2 triangles
+  const std::vector<uint16_t> indices_ = {
+    0,1,2,2,3,0
   };
 
   VkBuffer vertex_buffer_;
   VkDeviceMemory vertex_buffer_memory_;
+
+  VkBuffer index_buffer_;
+  VkDeviceMemory index_buffer_memory_;
 
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
@@ -322,4 +331,9 @@ class VulkanApp {
 
   void copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
     VkDeviceSize size);
+  
+  /* Create the index buffer that indicates which vertices to use
+  * from the vertex buffer and in what order.
+  */
+  void createIndexBuffer();
 };

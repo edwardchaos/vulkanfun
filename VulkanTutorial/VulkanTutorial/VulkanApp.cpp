@@ -75,10 +75,14 @@ void VulkanApp::mainLoop() {
 }
 
 void VulkanApp::cleanUp() {
+  cleanUpSwapChain();
+
+  vkDestroyBuffer(logical_device_, index_buffer_, nullptr);
+  vkFreeMemory(logical_device_, index_buffer_memory_, nullptr);
+
   vkDestroyBuffer(logical_device_, vertex_buffer_, nullptr);
   vkFreeMemory(logical_device_, vertex_buffer_memory_, nullptr);
 
-  cleanUpSwapChain();
   for(size_t i = 0; i < img_available_sems_.size(); ++i){
     vkDestroySemaphore(logical_device_, img_available_sems_[i], nullptr);
     vkDestroySemaphore(logical_device_, render_finish_sems_[i], nullptr);
@@ -1354,4 +1358,29 @@ void VulkanApp::copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
   vkQueueWaitIdle(graphics_queue_);
 
   vkFreeCommandBuffers(logical_device_, command_pool_, 1, &command_buffer);
+}
+
+void VulkanApp::createIndexBuffer(){
+  VkDeviceSize buff_size = sizeof(indices_[0]) * indices_.size();
+
+  // Create staging buffer
+  VkBuffer staging_buffer;
+  VkDeviceMemory staging_buffer_memory;
+  createBuffer(buff_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    staging_buffer, staging_buffer_memory);
+
+  void *data;
+  vkMapMemory(logical_device_, staging_buffer_memory, 0, buff_size, 0, &data);
+  memcpy(data, indices_.data(), (size_t)buff_size);
+  vkUnmapMemory(logical_device_, staging_buffer_memory);
+
+  createBuffer(buff_size,
+    VK_BUFFER_USAGE_TRANSFER_DST_BIT|VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, index_buffer_, index_buffer_memory_);
+
+  copyBuffer(staging_buffer, index_buffer_, buff_size);
+
+  vkDestroyBuffer(logical_device_, staging_buffer, nullptr);
+  vkFreeMemory(logical_device_, staging_buffer_memory, nullptr);
 }
