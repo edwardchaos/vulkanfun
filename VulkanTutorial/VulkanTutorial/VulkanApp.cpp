@@ -1230,44 +1230,18 @@ void VulkanApp::frameBufferResizeCallback(
 }
 
 void VulkanApp::createVertexBuffer(){
-  VkBufferCreateInfo buff_ci{};
-
-  buff_ci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-  buff_ci.size = sizeof(vertices_[0]) * vertices_.size();
-  buff_ci.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  buff_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-  if(vkCreateBuffer(logical_device_, &buff_ci, nullptr,
-    &vertex_buffer_)!=VK_SUCCESS){
-    throw std::runtime_error("Failed to create vertex buffer");
-  }
-
-  VkMemoryRequirements mem_req;
-  vkGetBufferMemoryRequirements(logical_device_, vertex_buffer_, &mem_req);
-
-  VkMemoryAllocateInfo mem_alloc_info{};
-  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  mem_alloc_info.allocationSize = mem_req.size;
-  mem_alloc_info.memoryTypeIndex =
-    findMemoryType(mem_req.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  
-  if(vkAllocateMemory(logical_device_, &mem_alloc_info, nullptr,
-    &vertex_buffer_memory_) != VK_SUCCESS){
-
-    throw std::runtime_error("Failed to allocate vertex buffer memory");
-  }
-
-  // Bind memory to vertex buffer
-  vkBindBufferMemory(logical_device_, vertex_buffer_, vertex_buffer_memory_, 0);
+  auto buff_size = sizeof(vertices_[0]) * vertices_.size();
+  createBuffer(buff_size, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT|VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    vertex_buffer_, vertex_buffer_memory_);
 
   void* data;
   // Map vertex buffer memory on gpu to cpu accessible memory
-  vkMapMemory(logical_device_, vertex_buffer_memory_, 0, buff_ci.size, 0,
+  vkMapMemory(logical_device_, vertex_buffer_memory_, 0, buff_size, 0,
     &data);
 
   // Copy vertex data to buffer
-  memcpy(data, vertices_.data(), (size_t)buff_ci.size);
+  memcpy(data, vertices_.data(), (size_t)buff_size);
   vkUnmapMemory(logical_device_, vertex_buffer_memory_);
 
 }
@@ -1287,4 +1261,35 @@ uint32_t VulkanApp::findMemoryType(
     }
   }
   throw std::runtime_error("Failed to find suitable memory type");
+}
+
+void VulkanApp::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage_flags,
+    VkMemoryPropertyFlags mem_prop_flags, VkBuffer& buffer,
+    VkDeviceMemory &buffer_memory){
+  VkBufferCreateInfo buff_ci{};
+  buff_ci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  buff_ci.size = size;
+  buff_ci.usage = usage_flags;
+  buff_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  if(vkCreateBuffer(logical_device_, &buff_ci, nullptr, &buffer) != VK_SUCCESS){
+    throw std::runtime_error("Failed to create vertex buffer");
+  }
+
+  VkMemoryRequirements mem_req;
+  vkGetBufferMemoryRequirements(logical_device_, buffer, &mem_req);
+
+  VkMemoryAllocateInfo mem_alloc_info{};
+  mem_alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  mem_alloc_info.allocationSize = mem_req.size;
+  mem_alloc_info.memoryTypeIndex =
+    findMemoryType(mem_req.memoryTypeBits, mem_prop_flags);
+  
+  if(vkAllocateMemory(logical_device_, &mem_alloc_info, nullptr, &buffer_memory) 
+    != VK_SUCCESS){
+    throw std::runtime_error("Failed to allocate vertex buffer memory");
+  }
+
+  // Bind memory to vertex buffer
+  vkBindBufferMemory(logical_device_, buffer, buffer_memory, 0);
 }

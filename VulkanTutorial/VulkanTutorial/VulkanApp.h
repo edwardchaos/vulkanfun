@@ -118,7 +118,7 @@ class VulkanApp {
   // Temporarily put vertex data here for development
   const std::vector<Vertex> vertices_ = {
     // Vertex, color
-    {{0.0f, -0.5f}, {1.0f,0.0f,0.0f}}, 
+    {{0.0f, -0.5f}, {1.0f,1.0f,1.0f}}, 
     {{0.5f, 0.5f}, {0.0f,1.0f,0.0f}},
     {{-0.5f, 0.5f}, {0.0f,0.0f,1.0f}}
   };
@@ -313,4 +313,10 @@ class VulkanApp {
   */
   uint32_t findMemoryType(uint32_t type_filter,
     VkMemoryPropertyFlags properties);
+
+  /* Helper function to create buffers
+  */
+  void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage_flags,
+    VkMemoryPropertyFlags mem_prop_flags, VkBuffer& buffer,
+    VkDeviceMemory &buffer_memory);
 };
