@@ -88,6 +88,8 @@ void VulkanApp::mainLoop() {
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
 
+  vkDestroyImage(logical_device_, texture_image_, nullptr);
+  vkFreeMemory(logical_device_, texture_image_memory_, nullptr);
   vkDestroyDescriptorSetLayout(logical_device_, descriptor_layout_, nullptr);
 
   vkDestroyBuffer(logical_device_, index_buffer_, nullptr);
@@ -1542,6 +1544,22 @@ void VulkanApp::createTextureImage(){
     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT 
     | VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
     texture_image_, texture_image_memory_);
+
+  // Transition image to proper layout for copying
+  transitionImageLayout(texture_image_,
+    VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+  copyBufferToImage(staging_buffer, texture_image_,
+    static_cast<uint32_t>(t_width), static_cast<uint32_t>(t_height));
+
+  // One last transition so shader can sample texels
+  transitionImageLayout(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+  vkDestroyBuffer(logical_device_, staging_buffer, nullptr);
+  vkFreeMemory(logical_device_, staging_buffer_memory, nullptr);
 }
 
 void VulkanApp::createImage(uint32_t width, uint32_t height, VkFormat format,
@@ -1641,9 +1659,32 @@ void VulkanApp::transitionImageLayout(VkImage image, VkFormat format,
   barrier.srcAccessMask = 0; // TODO
   barrier.dstAccessMask = 0; // TODO
 
+  VkPipelineStageFlags srcstage;
+  VkPipelineStageFlags dststage;
+
+  if(old_layout == VK_IMAGE_LAYOUT_UNDEFINED
+    && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL){
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+    // earliest possible pipeline stage, wait for top of pipeline.
+    srcstage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    // pseudo stage
+    dststage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+  }else if(old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+    && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL){
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+    srcstage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    dststage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  }else{
+    throw std::invalid_argument("Unsupported image layout transition");
+  }
+
   vkCmdPipelineBarrier(
     cb,
-    0/*todo*/,0/*todo*/,
+    srcstage,dststage,
     0,
     0, nullptr,
     0, nullptr,
