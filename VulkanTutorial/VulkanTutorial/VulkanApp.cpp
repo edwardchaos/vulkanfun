@@ -1637,4 +1637,18 @@ VkCommandBuffer VulkanApp::beginSingleTimeCommands(){
   return command_buffer;
 }
 
+void VulkanApp::endSingleTimecommands(VkCommandBuffer command_buffer){
+  vkEndCommandBuffer(command_buffer);
+
+  VkSubmitInfo si{};
+  si.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  si.commandBufferCount = 1;
+  si.pCommandBuffers = &command_buffer;
+
+  vkQueueSubmit(graphics_queue_, 1, &si, VK_NULL_HANDLE);
+  vkQueueWaitIdle(graphics_queue_);
+
+  vkFreeCommandBuffers(logical_device_, command_pool_, 1, &command_buffer);
+}
+
 }// namespace va

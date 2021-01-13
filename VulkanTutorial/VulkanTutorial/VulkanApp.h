@@ -374,6 +374,9 @@ class VulkanApp {
   /* Start a command buffer
   */
   VkCommandBuffer beginSingleTimeCommands();
+  /* End recording of a single time command buffer
+  */
+  void endSingleTimecommands(VkCommandBuffer command_buffer);
 };
 
 }  // namespace va
