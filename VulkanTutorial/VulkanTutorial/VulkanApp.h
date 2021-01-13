@@ -12,8 +12,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <stb_image.h>
-
 namespace va {
 
 struct UniformBufferObject {
@@ -368,6 +366,10 @@ class VulkanApp {
   void createDescriptorSets();
 
   void createTextureImage();
+
+  void createImage(uint32_t width, uint32_t height, VkFormat format,
+  VkImageTiling tiling, VkImageUsageFlags usage,
+  VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem);
 };
 
 }  // namespace va

@@ -5,6 +5,7 @@
 #include <iostream>
 #include <set>
 #define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 
 namespace va{
@@ -1569,14 +1570,52 @@ void VulkanApp::createTextureImage(){
   stbi_image_free(pixels);
 
   // Shader can read image from the buffer, but it's better to move to Image
+  createImage(t_width,t_height,VK_FORMAT_R8G8B8A8_SRGB,
+    VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT 
+    | VK_IMAGE_USAGE_SAMPLED_BIT,VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    texture_image_, texture_image_memory_);
+}
+
+void VulkanApp::createImage(uint32_t width, uint32_t height, VkFormat format,
+  VkImageTiling tiling, VkImageUsageFlags usage,
+  VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem){
+
   VkImageCreateInfo imageinfo{};
   imageinfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageinfo.imageType = VK_IMAGE_TYPE_2D;
-  imageinfo.extent.width = static_cast<uint32_t>(t_width);
-  imageinfo.extent.height = static_cast<uint32_t>(t_height);
+  imageinfo.extent.width = static_cast<uint32_t>(width);
+  imageinfo.extent.height = static_cast<uint32_t>(height);
   imageinfo.extent.depth = 1;
   imageinfo.mipLevels = 1;
-  imageinfo.arrayLayers = 1;
+  imageinfo.arrayLayers = 1; 
+  // Use same format for texel as the pixels in the buffer or copy will fail
+  imageinfo.format = format;
+  imageinfo.tiling = tiling;
+  imageinfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  imageinfo.usage = usage;
+  imageinfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+  imageinfo.samples = VK_SAMPLE_COUNT_1_BIT;
+  imageinfo.flags = 0; // Optional
+
+  if(vkCreateImage(logical_device_, &imageinfo, nullptr, &image) !=
+    VK_SUCCESS){
+    throw std::runtime_error("Failed to create texture image");
+  }
+
+  VkMemoryRequirements mem_req;
+  vkGetImageMemoryRequirements(logical_device_, image, &mem_req);
+
+  VkMemoryAllocateInfo memalloc{};
+  memalloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memalloc.allocationSize = mem_req.size;
+  memalloc.memoryTypeIndex = findMemoryType(mem_req.memoryTypeBits, properties);
+
+  if (vkAllocateMemory(logical_device_, &memalloc, nullptr,
+                       &image_mem) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to allocate image memory");
+  }
+
+  vkBindImageMemory(logical_device_, image, image_mem, 0);
 }
 
 }// namespace va
