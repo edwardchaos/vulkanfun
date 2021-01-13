@@ -364,6 +364,8 @@ class VulkanApp {
   void createDescriptorPool();
 
   void createDescriptorSets();
+
+  void createTextureImage();
 };
 
 }  // namespace va

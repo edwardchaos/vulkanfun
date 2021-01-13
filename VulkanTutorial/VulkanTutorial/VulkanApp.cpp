@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include <set>
+#define STB_IMAGE_IMPLEMENTATION
 
 
 namespace va{
@@ -672,8 +673,8 @@ void VulkanApp::createImageViews(){
 }
 
 void VulkanApp::createGraphicsPipeline(){
-  auto vert_shader_code = readFile("vert.spv");
-  auto frag_shader_code = readFile("frag.spv");
+  auto vert_shader_code = readFile("shader/vert.spv");
+  auto frag_shader_code = readFile("shader/frag.spv");
 
   VkShaderModule vert_shader_module = createShaderModule(vert_shader_code);
   VkShaderModule frag_shader_module = createShaderModule(frag_shader_code);
