@@ -64,6 +64,7 @@ void VulkanApp::initVulkan() {
   createGraphicsPipeline();
   createFrameBuffers();
   createCommandPool();
+  createTextureImage();
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
@@ -1535,6 +1536,9 @@ void VulkanApp::createDescriptorSets(){
     
     vkUpdateDescriptorSets(logical_device_, 1, &write, 0, nullptr);
   }
+}
+
+void VulkanApp::createTextureImage(){
 }
 
 }// namespace va
