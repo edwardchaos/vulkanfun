@@ -23,6 +23,7 @@ struct UniformBufferObject {
 struct Vertex {
   glm::vec2 pos;
   glm::vec3 color;
+  glm::vec2 texCoord;
 
   static VkVertexInputBindingDescription getBindingDescription() {
     VkVertexInputBindingDescription bd{};
@@ -33,9 +34,9 @@ struct Vertex {
     return bd;
   }
 
-  static std::array<VkVertexInputAttributeDescription, 2>
+  static std::array<VkVertexInputAttributeDescription, 3>
   getAttributeDescription() {
-    std::array<VkVertexInputAttributeDescription, 2> ads{};
+    std::array<VkVertexInputAttributeDescription, 3> ads{};
     ads[0].binding = 0;   // from which binding does vertex data come from?
     ads[0].location = 0;  // location directive in vertex shader
     ads[0].format = VK_FORMAT_R32G32_SFLOAT;  // bytesize of attribute data
@@ -45,6 +46,11 @@ struct Vertex {
     ads[1].location = 1;
     ads[1].format = VK_FORMAT_R32G32B32_SFLOAT;
     ads[1].offset = offsetof(Vertex, color);
+
+    ads[2].binding = 0;
+    ads[2].location = 2;
+    ads[2].format = VK_FORMAT_R32G32_SFLOAT;
+    ads[2].offset = offsetof(Vertex, texCoord);
     return ads;
   }
 };
