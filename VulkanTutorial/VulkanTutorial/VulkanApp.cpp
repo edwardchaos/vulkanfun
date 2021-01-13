@@ -1396,10 +1396,22 @@ void VulkanApp::createDescriptorSetLayout(){
   
   ubo_layout_binding.pImmutableSamplers = nullptr; // Optional
 
+  VkDescriptorSetLayoutBinding sampler_layout_binding{};
+  sampler_layout_binding.binding = 1;
+  sampler_layout_binding.descriptorCount = 1;
+  sampler_layout_binding.descriptorType =
+    VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  sampler_layout_binding.pImmutableSamplers = nullptr;
+  sampler_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+  std::array<VkDescriptorSetLayoutBinding, 2> bindings = {
+    ubo_layout_binding, sampler_layout_binding
+  };
+
   VkDescriptorSetLayoutCreateInfo layout_info{};
   layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-  layout_info.bindingCount = 1;
-  layout_info.pBindings = &ubo_layout_binding;
+  layout_info.bindingCount = static_cast<uint32_t>(bindings.size());
+  layout_info.pBindings = bindings.data();
 
   if (vkCreateDescriptorSetLayout(logical_device_, &layout_info, nullptr,
                                   &descriptor_layout_) != VK_SUCCESS) {
@@ -1450,16 +1462,18 @@ void VulkanApp::updateUniformBuffer(uint32_t uniform_buffer_idx){
 void VulkanApp::createDescriptorPool(){
   // What types of descriptors will be contained in descriptor set
   // How many there will be
-  VkDescriptorPoolSize dp_size{};
+  std::array<VkDescriptorPoolSize,2> dp_sizes{};
 
-  dp_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  // 1 for each swap chain
-  dp_size.descriptorCount = static_cast<uint32_t>(swapchain_images_.size());
+  // 1 for each swap chain image
+  dp_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  dp_sizes[0].descriptorCount = static_cast<uint32_t>(swapchain_images_.size());
+  dp_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  dp_sizes[1].descriptorCount = static_cast<uint32_t>(swapchain_images_.size());
 
   VkDescriptorPoolCreateInfo dp_info{};
   dp_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  dp_info.poolSizeCount = 1;
-  dp_info.pPoolSizes = &dp_size;
+  dp_info.poolSizeCount = static_cast<uint32_t>(dp_sizes.size());
+  dp_info.pPoolSizes = dp_sizes.data();
 
   // Maximum # of descriptor sets that may be allocated
   dp_info.maxSets = static_cast<uint32_t>(swapchain_images_.size());
@@ -1487,25 +1501,41 @@ void VulkanApp::createDescriptorSets(){
     throw std::runtime_error("Failed to create descriptor sets");
   }
 
+  // Bind sampler and texture image to descriptor sets
+  VkDescriptorImageInfo imageinfo{};
+  imageinfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+  imageinfo.sampler = texture_sampler_;
+  imageinfo.imageView = texture_img_view_;
+
   // Descriptor sets created, but empty. populate them.
+  // Link up resources of descriptors to descriptor sets.
   for(size_t i = 0; i < descriptor_sets_.size(); ++i){
     VkDescriptorBufferInfo buffer_info{};
     buffer_info.buffer = uniform_buffers_[i];
     buffer_info.offset = 0;
     buffer_info.range = sizeof(UniformBufferObject);
 
-    VkWriteDescriptorSet write{};
-    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    write.dstSet = descriptor_sets_[i];
-    write.dstBinding = 0;
-    write.dstArrayElement = 0; // Descriptors can be array. Use the first one.
-    write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    write.descriptorCount = 1;
-    write.pBufferInfo = &buffer_info; // refers to buffer data
-    write.pImageInfo = nullptr; // Optional; refers to image data
-    write.pTexelBufferView = nullptr; // Optional; refers to buffer views
+    std::array<VkWriteDescriptorSet,2> writes{};
     
-    vkUpdateDescriptorSets(logical_device_, 1, &write, 0, nullptr);
+    VkWriteDescriptorSet write{};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = descriptor_sets_[i];
+    writes[0].dstBinding = 0;
+    writes[0].dstArrayElement = 0; // Descriptors can be array. Use the first one.
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].descriptorCount = 1;
+    writes[0].pBufferInfo = &buffer_info; // refers to buffer data
+
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = descriptor_sets_[i];
+    writes[1].dstBinding = 1;
+    writes[1].dstArrayElement = 0;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].descriptorCount = 1;
+    writes[1].pImageInfo = &imageinfo;
+    
+    vkUpdateDescriptorSets(logical_device_, 
+      static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
   }
 }
 
