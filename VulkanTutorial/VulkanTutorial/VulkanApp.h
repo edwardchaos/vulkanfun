@@ -151,6 +151,8 @@ class VulkanApp {
   VkDeviceMemory texture_image_memory_;
 
   VkImageView texture_img_view_;
+
+  VkSampler texture_sampler_;
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -395,6 +397,8 @@ class VulkanApp {
   /* Helper function to create an image view
   */
   VkImageView createImageView(VkImage image, VkFormat format);
+
+  void createTextureSampler();
 };
 
 }  // namespace va

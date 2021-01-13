@@ -68,6 +68,7 @@ void VulkanApp::initVulkan() {
   createCommandPool();
   createTextureImage();
   createTextureImageView();
+  createTextureSampler();
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
@@ -88,6 +89,10 @@ void VulkanApp::mainLoop() {
 
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
+
+  // Texture sampler
+  vkDestroySampler(logical_device_, texture_sampler_, nullptr);
+
   // Texture image
   vkDestroyImageView(logical_device_, texture_img_view_, nullptr);
   vkDestroyImage(logical_device_, texture_image_, nullptr);
@@ -334,6 +339,9 @@ bool VulkanApp::isDeviceSuitable(VkPhysicalDevice device){
   if(!swap_chain_adequate) return false;
   // Still need to choose the right settings for swap chain.
 
+  // Check if device supports texture sampler anisotropy
+  if(!deviceFeatures.samplerAnisotropy) return false;
+
   return true;
 }
 
@@ -397,8 +405,8 @@ void VulkanApp::createLogicalDevice(){
   }
 
   // Specify device features that we'll use.
-  // TODO: everything is VK_FALSE for now, select features later.
   VkPhysicalDeviceFeatures device_features{};
+  device_features.samplerAnisotropy = VK_TRUE;
 
   VkDeviceCreateInfo logical_device_info{};
 
@@ -1735,5 +1743,49 @@ VkImageView VulkanApp::createImageView(VkImage image, VkFormat format){
   }
 
   return iv;
+}
+
+void VulkanApp::createTextureSampler(){
+  VkSamplerCreateInfo ci{};
+  ci.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+  // How to interpolate texels that are magnified or minified
+  ci.magFilter = VK_FILTER_LINEAR; // related to oversampling
+  ci.minFilter = VK_FILTER_LINEAR; // related to undersampling
+
+  // Axis-wise handling of sampling outside the texture
+  ci.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  ci.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  ci.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+  ci.anisotropyEnable = VK_TRUE;
+
+  // Maximum texel samples to determine the final color. more = looks better,
+  // but may be slower in performance
+  VkPhysicalDeviceProperties properties{};
+  vkGetPhysicalDeviceProperties(physical_device_, &properties);
+  ci.maxAnisotropy = properties.limits.maxSamplerAnisotropy; // max quality.
+
+  // This is the color shown when sampling beyond texture border and addressmode
+  // is set to clamp to border.
+  // Only black,white,or transparent. no arbitrary color.
+  ci.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+  ci.unnormalizedCoordinates = VK_FALSE;
+
+  // Mainly for 'percentage-closer filtering' for shadow maps.
+  ci.compareEnable = VK_FALSE;
+  ci.compareOp = VK_COMPARE_OP_ALWAYS;
+
+  // For mipmapping
+  ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  ci.mipLodBias = 0.0f;
+  ci.minLod = 0.0f;
+  ci.maxLod = 0.0f;
+
+  if(vkCreateSampler(logical_device_, &ci, nullptr, &texture_sampler_)
+    != VK_SUCCESS){
+    throw std::runtime_error("Failed to create texture sampler.");
+  }
 }
 }// namespace va
