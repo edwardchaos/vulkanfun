@@ -149,6 +149,8 @@ class VulkanApp {
 
   VkImage texture_image_;
   VkDeviceMemory texture_image_memory_;
+
+  VkImageView texture_img_view_;
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -385,6 +387,14 @@ class VulkanApp {
 
   void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
     uint32_t height);
+
+  /* To access images, we need image view.
+  */
+  void createTextureImageView();
+
+  /* Helper function to create an image view
+  */
+  VkImageView createImageView(VkImage image, VkFormat format);
 };
 
 }  // namespace va

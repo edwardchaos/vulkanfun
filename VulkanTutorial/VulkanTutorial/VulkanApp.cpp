@@ -67,6 +67,7 @@ void VulkanApp::initVulkan() {
   createFrameBuffers();
   createCommandPool();
   createTextureImage();
+  createTextureImageView();
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
@@ -87,22 +88,30 @@ void VulkanApp::mainLoop() {
 
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
-
+  // Texture image
+  vkDestroyImageView(logical_device_, texture_img_view_, nullptr);
   vkDestroyImage(logical_device_, texture_image_, nullptr);
   vkFreeMemory(logical_device_, texture_image_memory_, nullptr);
+
+  // Descriptor set
   vkDestroyDescriptorSetLayout(logical_device_, descriptor_layout_, nullptr);
 
+  // Vertex index buffer
   vkDestroyBuffer(logical_device_, index_buffer_, nullptr);
   vkFreeMemory(logical_device_, index_buffer_memory_, nullptr);
 
+  // Vertex buffer
   vkDestroyBuffer(logical_device_, vertex_buffer_, nullptr);
   vkFreeMemory(logical_device_, vertex_buffer_memory_, nullptr);
 
+  // Semaphores and fences
   for(size_t i = 0; i < img_available_sems_.size(); ++i){
     vkDestroySemaphore(logical_device_, img_available_sems_[i], nullptr);
     vkDestroySemaphore(logical_device_, render_finish_sems_[i], nullptr);
     vkDestroyFence(logical_device_, inflight_fences_[i], nullptr);
   }
+
+  // Command pool (also destroys command buffers allocated from this pool)
   vkDestroyCommandPool(logical_device_, command_pool_, nullptr);
 
   // Logical device 
@@ -648,29 +657,11 @@ void VulkanApp::createImageViews(){
 
   VkImageViewCreateInfo imgview_create_info{};
   for(size_t i = 0; i < swapchain_images_.size(); ++i){
-    imgview_create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    imgview_create_info.image = swapchain_images_[i];
-    imgview_create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    imgview_create_info.format = swapchain_img_format_;
-
-    imgview_create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imgview_create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imgview_create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-    imgview_create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-
-    // Image purpose and which part of image to access
-    imgview_create_info.subresourceRange.aspectMask = 
-      VK_IMAGE_ASPECT_COLOR_BIT;
-    // any mipmapping?
-    imgview_create_info.subresourceRange.baseMipLevel = 0;
-    imgview_create_info.subresourceRange.levelCount = 1;
-    imgview_create_info.subresourceRange.baseArrayLayer = 0;
-    imgview_create_info.subresourceRange.layerCount = 1;
-
-    if(vkCreateImageView(logical_device_, &imgview_create_info, nullptr,
-      &swapchain_imgviews_[i])
-      !=VK_SUCCESS){
-      throw std::runtime_error("Failed to create image view.");
+    try {
+    swapchain_imgviews_[i] = 
+      createImageView(swapchain_images_[i], swapchain_img_format_);
+    }catch(const std::exception &e){
+      throw std::runtime_error("Failed to create swap chain image view.");
     }
   }
 }
@@ -1715,5 +1706,34 @@ void VulkanApp::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width
     VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
   endSingleTimeCommands(cb);
+}
+
+void VulkanApp::createTextureImageView(){
+  try {
+    texture_img_view_ = createImageView(texture_image_, VK_FORMAT_R8G8B8A8_SRGB);
+  }catch(const std::exception &e){
+    throw std::runtime_error("Failed to create texture image view.");
+  }
+}
+
+VkImageView VulkanApp::createImageView(VkImage image, VkFormat format){
+  VkImageViewCreateInfo ci{};
+  ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  ci.image = image;
+  ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  ci.format = format;
+  ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  ci.subresourceRange.baseMipLevel = 0;
+  ci.subresourceRange.levelCount = 1;
+  ci.subresourceRange.baseArrayLayer = 0;
+  ci.subresourceRange.layerCount = 1;
+
+  VkImageView iv;
+  if(vkCreateImageView(logical_device_, &ci, nullptr, &iv) !=
+    VK_SUCCESS){
+    throw std::runtime_error("Failed to create image view.");
+  }
+
+  return iv;
 }
 }// namespace va
