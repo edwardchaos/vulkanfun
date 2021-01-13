@@ -1347,23 +1347,7 @@ void VulkanApp::copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
     VkDeviceSize size){
   // Data transfer between memory buffers go through command buffers.
   // Create transient command pool for this purpose.
-
-  VkCommandBufferAllocateInfo alloc_info{};
-  alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  alloc_info.commandPool = command_pool_;
-  alloc_info.commandBufferCount = 1;
-
-  VkCommandBuffer command_buffer;
-  vkAllocateCommandBuffers(logical_device_, &alloc_info, &command_buffer);
-
-  // Start record of transfer operation on command buffer
-  VkCommandBufferBeginInfo begin_info{};
-
-  begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-  begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-
-  vkBeginCommandBuffer(command_buffer, &begin_info);
+  VkCommandBuffer command_buffer =  beginSingleTimeCommands();
 
   VkBufferCopy copy_region{};
   copy_region.srcOffset = 0;
@@ -1371,23 +1355,7 @@ void VulkanApp::copyBuffer(VkBuffer src_buff, VkBuffer dst_buff,
   copy_region.size = size;
   vkCmdCopyBuffer(command_buffer, src_buff, dst_buff, 1, &copy_region);
 
-  // Finish recording command
-  vkEndCommandBuffer(command_buffer);
-
-  // Execute command immediately to do the transfer
-  VkSubmitInfo submit_info{};
-  submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-  submit_info.commandBufferCount = 1;
-  submit_info.pCommandBuffers = &command_buffer;
-
-  // By default, graphics queue supports transfer operations.
-  // No explicit transfer queue is necessary.
-  vkQueueSubmit(graphics_queue_, 1, &submit_info, VK_NULL_HANDLE);
-
-  // Could use a fence and use vkWaitForFences, or wait for queue to become idle
-  vkQueueWaitIdle(graphics_queue_);
-
-  vkFreeCommandBuffers(logical_device_, command_pool_, 1, &command_buffer);
+  endSingleTimeCommands(command_buffer);
 }
 
 void VulkanApp::createIndexBuffer(){
@@ -1637,7 +1605,7 @@ VkCommandBuffer VulkanApp::beginSingleTimeCommands(){
   return command_buffer;
 }
 
-void VulkanApp::endSingleTimecommands(VkCommandBuffer command_buffer){
+void VulkanApp::endSingleTimeCommands(VkCommandBuffer command_buffer){
   vkEndCommandBuffer(command_buffer);
 
   VkSubmitInfo si{};
