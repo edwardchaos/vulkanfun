@@ -1619,4 +1619,60 @@ void VulkanApp::endSingleTimeCommands(VkCommandBuffer command_buffer){
   vkFreeCommandBuffers(logical_device_, command_pool_, 1, &command_buffer);
 }
 
+void VulkanApp::transitionImageLayout(VkImage image, VkFormat format, 
+    VkImageLayout old_layout, VkImageLayout new_layout){
+  VkCommandBuffer cb = beginSingleTimeCommands();
+
+  VkImageMemoryBarrier barrier{};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = old_layout;
+  barrier.newLayout = new_layout;
+
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+  barrier.image = image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+
+  barrier.srcAccessMask = 0; // TODO
+  barrier.dstAccessMask = 0; // TODO
+
+  vkCmdPipelineBarrier(
+    cb,
+    0/*todo*/,0/*todo*/,
+    0,
+    0, nullptr,
+    0, nullptr,
+    1, &barrier
+  );
+
+  endSingleTimeCommands(cb);
+}
+
+void VulkanApp::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
+  uint32_t height){
+  VkCommandBuffer cb = beginSingleTimeCommands();
+
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+
+  region.imageOffset = {0,0,0};
+  region.imageExtent = {width, height, 1};
+  
+  vkCmdCopyBufferToImage(cb, buffer, image,
+    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+  endSingleTimeCommands(cb);
+}
 }// namespace va

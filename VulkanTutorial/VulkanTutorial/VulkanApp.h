@@ -377,6 +377,14 @@ class VulkanApp {
   /* End recording of a single time command buffer
   */
   void endSingleTimeCommands(VkCommandBuffer command_buffer);
+
+  /* Handle image layout transitions
+  */
+  void transitionImageLayout(VkImage image, VkFormat format, 
+    VkImageLayout old_layout, VkImageLayout new_layout);
+
+  void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
+    uint32_t height);
 };
 
 }  // namespace va
