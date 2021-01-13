@@ -1540,6 +1540,43 @@ void VulkanApp::createDescriptorSets(){
 }
 
 void VulkanApp::createTextureImage(){
+  // Load image
+  int t_width, t_height, t_channels;
+
+  stbi_uc* pixels = stbi_load("textures/texture.jpg", &t_width, &t_height,
+    &t_channels, STBI_rgb_alpha);
+
+  VkDeviceSize image_size = t_width*t_height*4;
+
+  if(!pixels){
+    throw std::runtime_error("Failed to load texture image");
+  }
+
+  // Image staging buffer
+  VkBuffer staging_buffer;
+  VkDeviceMemory staging_buffer_memory;
+
+  createBuffer(image_size,
+    VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+    staging_buffer, staging_buffer_memory);
+
+  // Copy image data to vulkan buffer
+  void* data;
+  vkMapMemory(logical_device_, staging_buffer_memory, 0, image_size, 0, &data);
+  memcpy(data, pixels, image_size);
+  vkUnmapMemory(logical_device_, staging_buffer_memory);
+  stbi_image_free(pixels);
+
+  // Shader can read image from the buffer, but it's better to move to Image
+  VkImageCreateInfo imageinfo{};
+  imageinfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+  imageinfo.imageType = VK_IMAGE_TYPE_2D;
+  imageinfo.extent.width = static_cast<uint32_t>(t_width);
+  imageinfo.extent.height = static_cast<uint32_t>(t_height);
+  imageinfo.extent.depth = 1;
+  imageinfo.mipLevels = 1;
+  imageinfo.arrayLayers = 1;
 }
 
 }// namespace va

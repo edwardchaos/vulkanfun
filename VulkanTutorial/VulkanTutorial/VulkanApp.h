@@ -149,6 +149,8 @@ class VulkanApp {
   VkDescriptorPool descriptor_pool_;
   std::vector<VkDescriptorSet> descriptor_sets_;
 
+  VkImage texture_image_;
+  VkDeviceMemory texture_image_memory_;
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
