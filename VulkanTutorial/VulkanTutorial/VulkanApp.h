@@ -370,6 +370,10 @@ class VulkanApp {
   void createImage(uint32_t width, uint32_t height, VkFormat format,
   VkImageTiling tiling, VkImageUsageFlags usage,
   VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem);
+
+  /* Start a command buffer
+  */
+  VkCommandBuffer beginSingleTimeCommands();
 };
 
 }  // namespace va

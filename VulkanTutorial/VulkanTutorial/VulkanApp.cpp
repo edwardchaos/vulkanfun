@@ -1618,4 +1618,23 @@ void VulkanApp::createImage(uint32_t width, uint32_t height, VkFormat format,
   vkBindImageMemory(logical_device_, image, image_mem, 0);
 }
 
+VkCommandBuffer VulkanApp::beginSingleTimeCommands(){
+  VkCommandBufferAllocateInfo allocinfo{};
+  allocinfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocinfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocinfo.commandPool = command_pool_;
+  allocinfo.commandBufferCount = 1;
+
+  VkCommandBuffer command_buffer;
+  vkAllocateCommandBuffers(logical_device_, &allocinfo, &command_buffer);
+
+  VkCommandBufferBeginInfo begininfo{};
+  begininfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+  begininfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+  vkBeginCommandBuffer(command_buffer, &begininfo);
+
+  return command_buffer;
+}
+
 }// namespace va
