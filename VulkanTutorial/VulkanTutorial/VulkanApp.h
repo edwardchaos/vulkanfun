@@ -416,6 +416,14 @@ class VulkanApp {
   VkImageView createImageView(VkImage image, VkFormat format);
 
   void createTextureSampler();
+
+  /* Depth buffer
+  */
+  void createDepthResources();
+
+  /* Find supported image formats
+  */
+  void findSupportedImageFormat();
 };
 
 }  // namespace va

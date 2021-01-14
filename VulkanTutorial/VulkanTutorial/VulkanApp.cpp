@@ -66,6 +66,7 @@ void VulkanApp::initVulkan() {
   createGraphicsPipeline();
   createFrameBuffers();
   createCommandPool();
+  createDepthResources();
   createTextureImage();
   createTextureImageView();
   createTextureSampler();
@@ -1819,5 +1820,33 @@ void VulkanApp::createTextureSampler(){
     != VK_SUCCESS){
     throw std::runtime_error("Failed to create texture sampler.");
   }
+}
+
+void VulkanApp::createDepthResources(){
+  //findSupportedImageFormat();
+  //createImage(swapchain_img_extent_.width, swapchain_img_extent_.height,
+   // VK_FORMAT_D32_SFLOAT_S8_UINT, 
+
+
+}
+
+VkFormat VulkanApp::findSupportedImageFormat(
+  const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+    VkFormatFeatureFlags features){
+
+  for(const auto & format : candidates){
+    VkFormatProperties props{};
+    vkGetPhysicalDeviceFormatProperties(physical_device_, format, &props);
+
+    if(tiling == VK_IMAGE_TILING_LINEAR
+      && (props.linearTilingFeatures & features) == features){
+      return format;
+    }else if(tiling == VK_IMAGE_TILING_OPTIMAL
+      && (props.optimalTilingFeatures & features) == features){
+      return format;
+    }
+  }
+
+  throw std::runtime_error("Failed to find supported image format");
 }
 }// namespace va
