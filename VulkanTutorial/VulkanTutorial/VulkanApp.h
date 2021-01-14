@@ -21,7 +21,7 @@ struct UniformBufferObject {
 };
 
 struct Vertex {
-  glm::vec2 pos;
+  glm::vec3 pos;
   glm::vec3 color;
   glm::vec2 texCoord;
 
@@ -39,7 +39,7 @@ struct Vertex {
     std::array<VkVertexInputAttributeDescription, 3> ads{};
     ads[0].binding = 0;   // from which binding does vertex data come from?
     ads[0].location = 0;  // location directive in vertex shader
-    ads[0].format = VK_FORMAT_R32G32_SFLOAT;  // bytesize of attribute data
+    ads[0].format = VK_FORMAT_R32G32B32_SFLOAT;  // bytesize of attribute data
     ads[0].offset = offsetof(Vertex, pos);    // # bytes from start of vertex
 
     ads[1].binding = 0;
