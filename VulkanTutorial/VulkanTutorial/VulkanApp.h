@@ -9,6 +9,7 @@
 #include "GLFW/glfw3.h"
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -136,10 +137,20 @@ class VulkanApp {
       {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
       {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
       {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}}};
+      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
+  
+      {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
+      {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
+  };
 
-  // Vertex indices outlining a rectangle formed by 2 triangles
-  const std::vector<uint16_t> indices_ = {0, 1, 2, 2, 3, 0};
+  // Indices into vertices_ representing triangles of the model.
+  const std::vector<uint16_t> indices_ = {
+    0,1,2,
+    2,3,0,
+    4,5,6,
+    6,7,4};
 
   VkBuffer vertex_buffer_;
   VkDeviceMemory vertex_buffer_memory_;
