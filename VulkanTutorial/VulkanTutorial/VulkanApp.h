@@ -133,10 +133,10 @@ class VulkanApp {
   // Temporarily put vertex data here for development
   const std::vector<Vertex> vertices_ = {
       // Vertex, color
-      {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
-      {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
-      {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}}};
+      {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
+      {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
+      {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}}};
 
   // Vertex indices outlining a rectangle formed by 2 triangles
   const std::vector<uint16_t> indices_ = {0, 1, 2, 2, 3, 0};
