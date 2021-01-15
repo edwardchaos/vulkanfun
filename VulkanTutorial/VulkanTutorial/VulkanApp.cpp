@@ -1910,7 +1910,7 @@ void VulkanApp::createTextureSampler(){
   ci.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
   ci.mipLodBias = 0.0f;
   ci.minLod = 0.0f;
-  ci.maxLod = 0.0f;
+  ci.maxLod = static_cast<uint32_t>(texture_miplevels_);
 
   if(vkCreateSampler(logical_device_, &ci, nullptr, &texture_sampler_)
     != VK_SUCCESS){
