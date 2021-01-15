@@ -1664,7 +1664,8 @@ void VulkanApp::createTextureImage(){
   //transitionImageLayout(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
   //  VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
   //  VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, texture_miplevels_);
-  generateMipmaps(texture_image_, t_width, t_height, texture_miplevels_);
+  generateMipmaps(texture_image_, VK_FORMAT_R8G8B8A8_SRGB, t_width, t_height, 
+    texture_miplevels_);
 
   vkDestroyBuffer(logical_device_, staging_buffer, nullptr);
   vkFreeMemory(logical_device_, staging_buffer_memory, nullptr);
@@ -2002,9 +2003,18 @@ void VulkanApp::loadModel(){
   }
 }
 
-void VulkanApp::generateMipmaps(VkImage image, int32_t width, int32_t height,
-    uint32_t miplevels, VkCommandBuffer cb){
+void VulkanApp::generateMipmaps(VkImage image, VkFormat format, int32_t width, 
+  int32_t height, uint32_t miplevels, VkCommandBuffer cb){
   // Assumes at this point image is in layout transfer dst optimal.
+  VkFormatProperties form_prop;
+  vkGetPhysicalDeviceFormatProperties(physical_device_, format, &form_prop);
+
+  if(!(form_prop.optimalTilingFeatures & 
+    VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT)){
+    throw std::runtime_error(
+      "Texture image format does not support linear blitting. Cannot create mipmaps.");
+  }
+
   if(cb == VK_NULL_HANDLE) cb = beginSingleTimeCommands();
 
   VkImageMemoryBarrier barr{};

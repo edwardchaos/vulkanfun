@@ -441,8 +441,11 @@ class VulkanApp {
   */
   void loadModel();
 
-  void generateMipmaps(VkImage image, int32_t width, int32_t height,
-    uint32_t miplevels, VkCommandBuffer cb=VK_NULL_HANDLE);
+  /* Generate mipmap using Blit (transfer operations and img mem barrier)
+  * Requires linear filtering interpolation. GPU needs to support that format.
+  */
+  void generateMipmaps(VkImage image, VkFormat format, int32_t width,
+    int32_t height, uint32_t miplevels, VkCommandBuffer cb=VK_NULL_HANDLE);
 };
 
 }  // namespace va
