@@ -152,7 +152,7 @@ void VulkanApp::createInstance() {
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
   appInfo.pEngineName = "No Engine Name";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  appInfo.apiVersion = VK_API_VERSION_1_2;
 
   // Not optional
   VkInstanceCreateInfo createInfo{};
@@ -994,7 +994,7 @@ void VulkanApp::createRenderPass(){
   VkRenderPassCreateInfo rp_ci{};
 
   rp_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  rp_ci.attachmentCount = attachments.size();
+  rp_ci.attachmentCount = static_cast<uint32_t>(attachments.size());
   rp_ci.pAttachments = attachments.data();
   rp_ci.subpassCount = 1;
   rp_ci.pSubpasses = &subpass_desc;
@@ -1047,7 +1047,7 @@ void VulkanApp::createFrameBuffers(){
     // Renderpass needs to be compatible with this frame buffer
     // i.e. roughly same number and type of attachments
     fb_ci.renderPass = render_pass_;
-    fb_ci.attachmentCount = attachments.size();
+    fb_ci.attachmentCount = static_cast<uint32_t>(attachments.size());
     fb_ci.pAttachments = attachments.data();
     fb_ci.width = swapchain_img_extent_.width;
     fb_ci.height = swapchain_img_extent_.height;
@@ -1117,7 +1117,8 @@ void VulkanApp::createCommandBuffers(){
     // Order should be identical to order of attachments in render pass def
     clear_values[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
     clear_values[1].depthStencil = {1.0f, 0};
-    renderpass_info.clearValueCount = clear_values.size();
+    renderpass_info.clearValueCount = 
+      static_cast<uint32_t>(clear_values.size());
     renderpass_info.pClearValues = clear_values.data();
 
     // Start recording command to buffer, commands go to command buffer [i]
