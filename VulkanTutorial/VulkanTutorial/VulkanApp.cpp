@@ -80,7 +80,8 @@ void VulkanApp::initVulkan() {
   createDescriptorSetLayout();
   createGraphicsPipeline();
   createCommandPool();
-  createDepthResources();
+  createColorResources(); // Msaa color render target
+  createDepthResources(); // Depth buffer with msaa
   createFrameBuffers(); // After pipeline , color, depth
   createTextureImage();
   createTextureImageView();
@@ -320,6 +321,7 @@ void VulkanApp::pickPhysicalDevice() {
     if(isDeviceSuitable(device)){
       // Just select the first device
       physical_device_ = device;
+      msaa_samples_ = getMaxUsableSampleCount();
       break;
     }
   }
@@ -792,7 +794,7 @@ void VulkanApp::createGraphicsPipeline(){
   multisampling.sType = 
     VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
   multisampling.sampleShadingEnable = VK_FALSE;
-  multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+  multisampling.rasterizationSamples = msaa_samples_;
   multisampling.minSampleShading = 1.0f; // Optional
   multisampling.pSampleMask = nullptr; // optional
   multisampling.alphaToCoverageEnable = VK_FALSE; // optional
@@ -952,7 +954,7 @@ void VulkanApp::createRenderPass(){
 
   // Single color buffer
   color_attachment.format = swapchain_img_format_;
-  color_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+  color_attachment.samples = msaa_samples_;
 
   // What to do with data in attachment before and after rendering.
   // Applies to color and depth data, not stencil data.
@@ -970,21 +972,20 @@ void VulkanApp::createRenderPass(){
   // Which layout the image will have before render pass begins
   color_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   // Which layout to automatically transition to when render pass finishes.
-  color_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  // MSAA image cannot be presented directly. Need to resolve before present
+  color_attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-  // Subpasses, we'll just have one
   VkAttachmentReference colorattachmentref{};
-
   // Which attachment to reference to by idx in the attachment descriptions
   colorattachmentref.attachment = 0;
-
   // Which layout to have during the subpass
   colorattachmentref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
 
   // Depth attachment
   VkAttachmentDescription depth_attach{};
   depth_attach.format = findDepthFormat();
-  depth_attach.samples = VK_SAMPLE_COUNT_1_BIT;
+  depth_attach.samples = msaa_samples_;
   depth_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
   depth_attach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
   depth_attach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; 
@@ -996,15 +997,31 @@ void VulkanApp::createRenderPass(){
   depth_ref.attachment = 1;
   depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+
+  VkAttachmentDescription color_attach_resolve{};
+  color_attach_resolve.format = swapchain_img_format_;
+  color_attach_resolve.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  color_attach_resolve.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  color_attach_resolve.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  color_attach_resolve.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+  color_attach_resolve.samples = VK_SAMPLE_COUNT_1_BIT;
+  color_attach_resolve.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+  color_attach_resolve.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+  VkAttachmentReference color_resolve_ref{};
+  color_resolve_ref.attachment = 2;
+  color_resolve_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
   VkSubpassDescription subpass_desc{};
   // May support compute subpasses in the future, be explicit
   subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass_desc.colorAttachmentCount = 1;
   subpass_desc.pColorAttachments = &colorattachmentref;
   subpass_desc.pDepthStencilAttachment = &depth_ref; // Only one allowed.
+  subpass_desc.pResolveAttachments = &color_resolve_ref;
 
-  std::array<VkAttachmentDescription,2> attachments{color_attachment,
-  depth_attach};
+  std::array<VkAttachmentDescription,3> attachments{color_attachment,
+  depth_attach, color_attach_resolve};
 
   // We have attachment and basic subpass referencing. Create render pass
   VkRenderPassCreateInfo rp_ci{};
@@ -1054,8 +1071,8 @@ void VulkanApp::createFrameBuffers(){
   swapchain_frame_buffers_.resize(swapchain_imgviews_.size());
 
   for(size_t i = 0; i < swapchain_imgviews_.size(); ++i){
-    std::array<VkImageView,2> attachments{
-      swapchain_imgviews_[i], depth_image_view_
+    std::array<VkImageView,3> attachments{
+      color_image_view_, depth_image_view_, swapchain_imgviews_[i]
     };
 
     VkFramebufferCreateInfo fb_ci{};
@@ -1285,6 +1302,7 @@ void VulkanApp::recreateSwapChain(){
   createImageViews();
   createRenderPass();
   createGraphicsPipeline();
+  createColorResources();
   createDepthResources();
   createFrameBuffers();
   createUniformBuffers();
@@ -1294,10 +1312,15 @@ void VulkanApp::recreateSwapChain(){
 }
 
 void VulkanApp::cleanUpSwapChain(){
+  // Msaa color image
+  vkDestroyImageView(logical_device_, color_image_view_, nullptr);
+  vkDestroyImage(logical_device_, color_image_, nullptr);
+  vkFreeMemory(logical_device_, color_image_memory_, nullptr);
+
   // Depth image
+  vkDestroyImageView(logical_device_, depth_image_view_, nullptr);
   vkDestroyImage(logical_device_, depth_image_, nullptr);
   vkFreeMemory(logical_device_, depth_image_memory_, nullptr);
-  vkDestroyImageView(logical_device_, depth_image_view_, nullptr);
 
   for(auto framebuffer : swapchain_frame_buffers_){
     vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
@@ -1650,7 +1673,8 @@ void VulkanApp::createTextureImage(){
     | VK_IMAGE_USAGE_SAMPLED_BIT
     | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // for blit mip
     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-    texture_image_, texture_image_memory_, texture_miplevels_);
+    texture_image_, texture_image_memory_, texture_miplevels_,
+    VK_SAMPLE_COUNT_1_BIT);
 
   // Transition image to proper layout for copying
   transitionImageLayout(texture_image_,
@@ -1674,7 +1698,7 @@ void VulkanApp::createTextureImage(){
 void VulkanApp::createImage(uint32_t width, uint32_t height, VkFormat format,
   VkImageTiling tiling, VkImageUsageFlags usage,
   VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem,
-  uint32_t miplevels){
+  uint32_t miplevels, VkSampleCountFlagBits msaa_samples){
 
   VkImageCreateInfo imageinfo{};
   imageinfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1690,7 +1714,7 @@ void VulkanApp::createImage(uint32_t width, uint32_t height, VkFormat format,
   imageinfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
   imageinfo.usage = usage;
   imageinfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-  imageinfo.samples = VK_SAMPLE_COUNT_1_BIT;
+  imageinfo.samples = msaa_samples;
   imageinfo.flags = 0; // Optional
 
   if(vkCreateImage(logical_device_, &imageinfo, nullptr, &image) !=
@@ -1922,7 +1946,8 @@ void VulkanApp::createDepthResources(){
   VkFormat format = findDepthFormat();
   createImage(swapchain_img_extent_.width, swapchain_img_extent_.height,
    format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image_, depth_image_memory_, 1); 
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image_, depth_image_memory_, 1,
+    msaa_samples_); 
 
   depth_image_view_ = createImageView(depth_image_, format,
     VK_IMAGE_ASPECT_DEPTH_BIT, 1);
@@ -2092,5 +2117,42 @@ void VulkanApp::generateMipmaps(VkImage image, VkFormat format, int32_t width,
     1, &barr);
 
   endSingleTimeCommands(cb);
+}
+
+VkSampleCountFlagBits VulkanApp::getMaxUsableSampleCount(){
+  VkPhysicalDeviceProperties physical_device_properties{};
+
+  vkGetPhysicalDeviceProperties(physical_device_, &physical_device_properties);
+
+  VkSampleCountFlags counts = 
+    physical_device_properties.limits.framebufferColorSampleCounts 
+    & physical_device_properties.limits.framebufferDepthSampleCounts;
+
+  // counts is a bitfield, select the highest supported msaa.
+  if(counts & VK_SAMPLE_COUNT_64_BIT) {return VK_SAMPLE_COUNT_64_BIT;}
+  else if(counts & VK_SAMPLE_COUNT_32_BIT) {return VK_SAMPLE_COUNT_32_BIT;}
+  else if(counts & VK_SAMPLE_COUNT_16_BIT) {return VK_SAMPLE_COUNT_16_BIT;}
+  else if(counts & VK_SAMPLE_COUNT_8_BIT) {return VK_SAMPLE_COUNT_8_BIT;}
+  else if(counts & VK_SAMPLE_COUNT_4_BIT) {return VK_SAMPLE_COUNT_4_BIT;}
+  else if(counts & VK_SAMPLE_COUNT_2_BIT) {return VK_SAMPLE_COUNT_2_BIT;}
+  else return VK_SAMPLE_COUNT_1_BIT;
+}
+
+void VulkanApp::createColorResources(){
+  VkFormat color_format = swapchain_img_format_;
+
+  createImage(swapchain_img_extent_.width, swapchain_img_extent_.height,
+    color_format, VK_IMAGE_TILING_OPTIMAL,
+      VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT
+    | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+    color_image_, color_image_memory_,
+    1,
+    msaa_samples_);
+
+  color_image_view_ = 
+  createImageView(color_image_, color_format, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+
+
 }
 }// namespace va

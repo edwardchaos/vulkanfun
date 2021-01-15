@@ -170,6 +170,13 @@ class VulkanApp {
   VkImageView depth_image_view_;
   VkDeviceMemory depth_image_memory_;
 
+  VkSampleCountFlagBits msaa_samples_ = VK_SAMPLE_COUNT_1_BIT;
+
+  // Add a render target for use in msaa
+  VkImage color_image_;
+  VkDeviceMemory color_image_memory_;
+  VkImageView color_image_view_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -391,7 +398,7 @@ class VulkanApp {
   void createImage(uint32_t width, uint32_t height, VkFormat format,
   VkImageTiling tiling, VkImageUsageFlags usage,
   VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem,
-    uint32_t miplevels);
+    uint32_t miplevels, VkSampleCountFlagBits msaa_samples);
 
   /* Start a command buffer
   */
@@ -446,6 +453,16 @@ class VulkanApp {
   */
   void generateMipmaps(VkImage image, VkFormat format, int32_t width,
     int32_t height, uint32_t miplevels, VkCommandBuffer cb=VK_NULL_HANDLE);
+
+  /* Maximum sampling count depends on both the max for image and depth buffer.
+  * max = min(max_img_sample, max_depth_sample);
+  */
+  VkSampleCountFlagBits getMaxUsableSampleCount();
+
+  /* Create msaa color buffer
+  */
+  void createColorResources();
+
 };
 
 }  // namespace va
