@@ -64,9 +64,9 @@ void VulkanApp::initVulkan() {
   createRenderPass();
   createDescriptorSetLayout();
   createGraphicsPipeline();
-  createFrameBuffers();
   createCommandPool();
   createDepthResources();
+  createFrameBuffers(); // After pipeline , color, depth
   createTextureImage();
   createTextureImageView();
   createTextureSampler();
@@ -1025,8 +1025,8 @@ void VulkanApp::createFrameBuffers(){
   swapchain_frame_buffers_.resize(swapchain_imgviews_.size());
 
   for(size_t i = 0; i < swapchain_imgviews_.size(); ++i){
-    VkImageView attachments[]={
-      swapchain_imgviews_[i]
+    std::array<VkImageView,2> attachments{
+      swapchain_imgviews_[i], depth_image_view_
     };
 
     VkFramebufferCreateInfo fb_ci{};
@@ -1034,8 +1034,8 @@ void VulkanApp::createFrameBuffers(){
     // Renderpass needs to be compatible with this frame buffer
     // i.e. roughly same number and type of attachments
     fb_ci.renderPass = render_pass_;
-    fb_ci.attachmentCount = 1;
-    fb_ci.pAttachments = attachments;
+    fb_ci.attachmentCount = attachments.size();
+    fb_ci.pAttachments = attachments.data();
     fb_ci.width = swapchain_img_extent_.width;
     fb_ci.height = swapchain_img_extent_.height;
     fb_ci.layers = 1; // # of layers in img arrays
@@ -1045,7 +1045,6 @@ void VulkanApp::createFrameBuffers(){
       throw std::runtime_error("Failed to create framebuffer.");
     }
   }
-
 }
 
 void VulkanApp::createCommandPool(){
@@ -1101,9 +1100,12 @@ void VulkanApp::createCommandBuffers(){
     renderpass_info.renderArea.offset = { 0, 0 };
     renderpass_info.renderArea.extent = swapchain_img_extent_;
 
-    VkClearValue clear_color{0.0f,0.0f,0.0f,1.0f};
-    renderpass_info.clearValueCount = 1;
-    renderpass_info.pClearValues = &clear_color;
+    std::array<VkClearValue,2> clear_values;
+    // Order should be identical to order of attachments in render pass def
+    clear_values[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
+    clear_values[1].depthStencil = {1.0f, 0};
+    renderpass_info.clearValueCount = clear_values.size();
+    renderpass_info.pClearValues = clear_values.data();
 
     // Start recording command to buffer, commands go to command buffer [i]
     vkCmdBeginRenderPass(command_buffers_[i], &renderpass_info,
