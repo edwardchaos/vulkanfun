@@ -91,6 +91,11 @@ void VulkanApp::mainLoop() {
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
 
+  // Depth image
+  vkDestroyImage(logical_device_, depth_image_, nullptr);
+  vkFreeMemory(logical_device_, depth_image_memory_, nullptr);
+  vkDestroyImageView(logical_device_, depth_image_view_, nullptr);
+
   // Texture sampler
   vkDestroySampler(logical_device_, texture_sampler_, nullptr);
 
@@ -670,7 +675,8 @@ void VulkanApp::createImageViews(){
   for(size_t i = 0; i < swapchain_images_.size(); ++i){
     try {
     swapchain_imgviews_[i] = 
-      createImageView(swapchain_images_[i], swapchain_img_format_);
+      createImageView(swapchain_images_[i], swapchain_img_format_,
+        VK_IMAGE_ASPECT_COLOR_BIT);
     }catch(const std::exception &e){
       throw std::runtime_error("Failed to create swap chain image view.");
     }
@@ -946,18 +952,37 @@ void VulkanApp::createRenderPass(){
   // Which layout to have during the subpass
   colorattachmentref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+  // Depth attachment
+  VkAttachmentDescription depth_attach{};
+  depth_attach.format = findDepthFormat();
+  depth_attach.samples = VK_SAMPLE_COUNT_1_BIT;
+  depth_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+  depth_attach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth_attach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE; 
+  depth_attach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+  depth_attach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+  depth_attach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+  VkAttachmentReference depth_ref{};
+  depth_ref.attachment = 1;
+  depth_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
   VkSubpassDescription subpass_desc{};
   // May support compute subpasses in the future, be explicit
   subpass_desc.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
   subpass_desc.colorAttachmentCount = 1;
   subpass_desc.pColorAttachments = &colorattachmentref;
+  subpass_desc.pDepthStencilAttachment = &depth_ref; // Only one allowed.
+
+  std::array<VkAttachmentDescription,2> attachments{color_attachment,
+  depth_attach};
 
   // We have attachment and basic subpass referencing. Create render pass
   VkRenderPassCreateInfo rp_ci{};
 
   rp_ci.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-  rp_ci.attachmentCount = 1;
-  rp_ci.pAttachments = &color_attachment;
+  rp_ci.attachmentCount = attachments.size();
+  rp_ci.pAttachments = attachments.data();
   rp_ci.subpassCount = 1;
   rp_ci.pSubpasses = &subpass_desc;
 
@@ -970,15 +995,21 @@ void VulkanApp::createRenderPass(){
   subpass_dependency.dstSubpass = 0; // Our subpass
   // Wait till the implicit subpass before ours has the color attachment bit set
   subpass_dependency.srcStageMask =
-    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
   subpass_dependency.srcAccessMask = 0;
 
   // The operations that should wait for the color output bit in the next subpass
   // are writing color.
   subpass_dependency.dstStageMask =
-    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT
+    | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
   subpass_dependency.dstAccessMask = 
-    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT
+
+    // Since depth load operation clears the depth image, the first operation
+    // is a write.
+    | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
   
   rp_ci.dependencyCount = 1;
   rp_ci.pDependencies = &subpass_dependency;
@@ -1682,14 +1713,21 @@ void VulkanApp::transitionImageLayout(VkImage image, VkFormat format,
   barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 
   barrier.image = image;
-  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+
+  if(new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+
+    // Turn on stencil bit as well.
+    if(hasStencilComponent(format))
+      barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+
+  }else{
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  }
   barrier.subresourceRange.baseMipLevel = 0;
   barrier.subresourceRange.levelCount = 1;
   barrier.subresourceRange.baseArrayLayer = 0;
   barrier.subresourceRange.layerCount = 1;
-
-  barrier.srcAccessMask = 0; // TODO
-  barrier.dstAccessMask = 0; // TODO
 
   VkPipelineStageFlags srcstage;
   VkPipelineStageFlags dststage;
@@ -1710,6 +1748,15 @@ void VulkanApp::transitionImageLayout(VkImage image, VkFormat format,
 
     srcstage = VK_PIPELINE_STAGE_TRANSFER_BIT;
     dststage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+  }else if(old_layout == VK_IMAGE_LAYOUT_UNDEFINED
+    && new_layout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL){
+    barrier.srcAccessMask = 0;
+    barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
+      | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    
+    srcstage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    dststage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+
   }else{
     throw std::invalid_argument("Unsupported image layout transition");
   }
@@ -1751,19 +1798,21 @@ void VulkanApp::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width
 
 void VulkanApp::createTextureImageView(){
   try {
-    texture_img_view_ = createImageView(texture_image_, VK_FORMAT_R8G8B8A8_SRGB);
+    texture_img_view_ = createImageView(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
+      VK_IMAGE_ASPECT_COLOR_BIT);
   }catch(const std::exception &e){
     throw std::runtime_error("Failed to create texture image view.");
   }
 }
 
-VkImageView VulkanApp::createImageView(VkImage image, VkFormat format){
+VkImageView VulkanApp::createImageView(VkImage image, VkFormat format,
+  VkImageAspectFlags aspect_mask){
   VkImageViewCreateInfo ci{};
   ci.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
   ci.image = image;
   ci.viewType = VK_IMAGE_VIEW_TYPE_2D;
   ci.format = format;
-  ci.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  ci.subresourceRange.aspectMask = aspect_mask;
   ci.subresourceRange.baseMipLevel = 0;
   ci.subresourceRange.levelCount = 1;
   ci.subresourceRange.baseArrayLayer = 0;
@@ -1823,11 +1872,16 @@ void VulkanApp::createTextureSampler(){
 }
 
 void VulkanApp::createDepthResources(){
-  //findSupportedImageFormat();
-  //createImage(swapchain_img_extent_.width, swapchain_img_extent_.height,
-   // VK_FORMAT_D32_SFLOAT_S8_UINT, 
+  VkFormat format = findDepthFormat();
+  createImage(swapchain_img_extent_.width, swapchain_img_extent_.height,
+   format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image_, depth_image_memory_); 
 
+  depth_image_view_ = createImageView(depth_image_, format,
+    VK_IMAGE_ASPECT_DEPTH_BIT);
 
+  transitionImageLayout(depth_image_, format, VK_IMAGE_LAYOUT_UNDEFINED,
+    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 }
 
 VkFormat VulkanApp::findSupportedImageFormat(
@@ -1848,5 +1902,18 @@ VkFormat VulkanApp::findSupportedImageFormat(
   }
 
   throw std::runtime_error("Failed to find supported image format");
+}
+
+VkFormat VulkanApp::findDepthFormat(){
+  return findSupportedImageFormat(
+    {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, 
+    VK_FORMAT_D24_UNORM_S8_UINT},
+    VK_IMAGE_TILING_OPTIMAL, // let vulkan handle internal gpu memory tiling
+    VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+}
+
+bool VulkanApp::hasStencilComponent(VkFormat format){
+  return format == VK_FORMAT_D32_SFLOAT
+    || format == VK_FORMAT_D24_UNORM_S8_UINT;
 }
 }// namespace va

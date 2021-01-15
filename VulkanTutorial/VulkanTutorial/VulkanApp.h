@@ -170,6 +170,10 @@ class VulkanApp {
   VkImageView texture_img_view_;
 
   VkSampler texture_sampler_;
+
+  VkImage depth_image_;
+  VkImageView depth_image_view_;
+  VkDeviceMemory depth_image_memory_;
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -413,7 +417,8 @@ class VulkanApp {
 
   /* Helper function to create an image view
   */
-  VkImageView createImageView(VkImage image, VkFormat format);
+  VkImageView createImageView(VkImage image, VkFormat format,
+    VkImageAspectFlags aspect_mask);
 
   void createTextureSampler();
 
@@ -422,8 +427,18 @@ class VulkanApp {
   void createDepthResources();
 
   /* Find supported image formats
+  * Format depends on tiling mode and usage.
   */
-  void findSupportedImageFormat();
+  VkFormat findSupportedImageFormat(
+  const std::vector<VkFormat> &candidates, VkImageTiling tiling,
+    VkFormatFeatureFlags features);
+
+  /*Find format specifically for depth img*/
+  VkFormat findDepthFormat();
+
+  /* Indicates whether the chosen format has a stencil component
+  */
+  bool hasStencilComponent(VkFormat format);
 };
 
 }  // namespace va
