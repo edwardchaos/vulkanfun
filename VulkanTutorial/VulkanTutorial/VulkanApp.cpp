@@ -1964,7 +1964,7 @@ void VulkanApp::loadModel(){
       };
       vertex.texCoord = {
         attrib.texcoords[2*idx.texcoord_index],
-        attrib.texcoords[2*idx.texcoord_index+1]
+        1.0f-attrib.texcoords[2*idx.texcoord_index+1]
       };
       vertex.color = {1.0f, 1.0f, 1.0f};
 
