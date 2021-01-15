@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <iostream>
+#include <unordered_map>
 #include <set>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -10,6 +11,17 @@
 
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h> 
+
+namespace std{
+  template<>
+  struct hash<va::Vertex>{
+    size_t operator()(va::Vertex const& vertex) const {
+      return ((hash<glm::vec3>()(vertex.pos) ^
+        (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+        (hash<glm::vec2>()(vertex.texCoord) << 1);
+    }
+  };
+}
 
 namespace va{
 VkResult VulkanApp::CreateDebugUtilsMessengerEXT(
@@ -1954,6 +1966,8 @@ void VulkanApp::loadModel(){
     throw std::runtime_error(warn + err);
   }
 
+  uint32_t idx_count = 0;
+  std::unordered_map<Vertex, uint32_t> vertex_2_idx;
   for(const auto& shape : shapes){
     for(const auto & idx : shape.mesh.indices){
       Vertex vertex{};
@@ -1968,8 +1982,14 @@ void VulkanApp::loadModel(){
       };
       vertex.color = {1.0f, 1.0f, 1.0f};
 
-      vertices_.push_back(vertex);
-      indices_.push_back(indices_.size());
+      if(vertex_2_idx.find(vertex) != vertex_2_idx.end()){
+        indices_.push_back(vertex_2_idx.at(vertex));
+      }else{
+        vertices_.push_back(vertex);
+        vertex_2_idx.emplace(vertex, idx_count);
+        indices_.push_back(idx_count);
+        ++idx_count;
+      }
     }
   }
 }

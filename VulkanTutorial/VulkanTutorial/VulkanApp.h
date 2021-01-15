@@ -13,6 +13,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/hash.hpp>
+
 namespace va {
 
 struct UniformBufferObject {
@@ -25,6 +28,12 @@ struct Vertex {
   glm::vec3 pos;
   glm::vec3 color;
   glm::vec2 texCoord;
+
+  bool operator==(const Vertex&other) const{
+    return pos == other.pos
+      && color == other.color
+      && texCoord == other.texCoord;
+  }
 
   static VkVertexInputBindingDescription getBindingDescription() {
     VkVertexInputBindingDescription bd{};
