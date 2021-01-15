@@ -842,6 +842,24 @@ void VulkanApp::createGraphicsPipeline(){
     throw std::runtime_error("Failed to create pipeline layout");
   }
 
+  // Depth buffering/ stencil mask stage
+  VkPipelineDepthStencilStateCreateInfo depth_stencil{};
+  depth_stencil.sType =
+    VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+  // If depth of fragments should be compared with depth buffer
+  depth_stencil.depthTestEnable = VK_TRUE;
+  // If fragment is infront, should depth buffer be updated?
+  depth_stencil.depthWriteEnable = VK_TRUE;
+  // Depth of fragments that are close is less.
+  depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
+  depth_stencil.depthBoundsTestEnable = VK_FALSE;
+  depth_stencil.minDepthBounds = 0.0f; // Optional
+  depth_stencil.maxDepthBounds = 1.0f; // Optional
+
+  depth_stencil.stencilTestEnable = VK_FALSE;
+  depth_stencil.front = {}; // Optional
+  depth_stencil.back = {}; // Optional
+
   VkGraphicsPipelineCreateInfo pipeline_ci{};
   pipeline_ci.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipeline_ci.stageCount = 2;
@@ -855,7 +873,7 @@ void VulkanApp::createGraphicsPipeline(){
   pipeline_ci.pViewportState = &viewport_state_ci;
   pipeline_ci.pRasterizationState = &rasterizer;
   pipeline_ci.pMultisampleState = &multisampling;
-  pipeline_ci.pDepthStencilState = nullptr;
+  pipeline_ci.pDepthStencilState = &depth_stencil;
   pipeline_ci.pColorBlendState = &colorBlending;
   pipeline_ci.pDynamicState = nullptr;
 
@@ -1915,7 +1933,8 @@ VkFormat VulkanApp::findDepthFormat(){
 }
 
 bool VulkanApp::hasStencilComponent(VkFormat format){
-  return format == VK_FORMAT_D32_SFLOAT
-    || format == VK_FORMAT_D24_UNORM_S8_UINT;
+  return format == VK_FORMAT_D32_SFLOAT_S8_UINT
+    || format == VK_FORMAT_D24_UNORM_S8_UINT
+    || format == VK_FORMAT_D16_UNORM_S8_UINT;
 }
 }// namespace va
