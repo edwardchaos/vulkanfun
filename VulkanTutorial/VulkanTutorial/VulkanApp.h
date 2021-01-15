@@ -158,6 +158,7 @@ class VulkanApp {
   VkDescriptorPool descriptor_pool_;
   std::vector<VkDescriptorSet> descriptor_sets_;
 
+  uint32_t texture_miplevels_;
   VkImage texture_image_;
   VkDeviceMemory texture_image_memory_;
 
@@ -168,6 +169,7 @@ class VulkanApp {
   VkImage depth_image_;
   VkImageView depth_image_view_;
   VkDeviceMemory depth_image_memory_;
+
 #ifdef NDEBUG
   const bool enable_valid_layers_ = false;
 #else
@@ -388,7 +390,8 @@ class VulkanApp {
 
   void createImage(uint32_t width, uint32_t height, VkFormat format,
   VkImageTiling tiling, VkImageUsageFlags usage,
-  VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem);
+  VkMemoryPropertyFlags properties, VkImage &image, VkDeviceMemory &image_mem,
+    uint32_t miplevels);
 
   /* Start a command buffer
   */
@@ -400,7 +403,7 @@ class VulkanApp {
   /* Handle image layout transitions
   */
   void transitionImageLayout(VkImage image, VkFormat format, 
-    VkImageLayout old_layout, VkImageLayout new_layout);
+    VkImageLayout old_layout, VkImageLayout new_layout, uint32_t miplevels);
 
   void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
     uint32_t height);
@@ -412,7 +415,7 @@ class VulkanApp {
   /* Helper function to create an image view
   */
   VkImageView createImageView(VkImage image, VkFormat format,
-    VkImageAspectFlags aspect_mask);
+    VkImageAspectFlags aspect_mask, uint32_t miplevels);
 
   void createTextureSampler();
 
@@ -437,6 +440,9 @@ class VulkanApp {
   /* Load obj model with tinyobjloader
   */
   void loadModel();
+
+  void generateMipmaps(VkImage image, int32_t width, int32_t height,
+    uint32_t miplevels, VkCommandBuffer cb=VK_NULL_HANDLE);
 };
 
 }  // namespace va
