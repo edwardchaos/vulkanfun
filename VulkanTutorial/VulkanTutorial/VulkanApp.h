@@ -81,6 +81,9 @@ class VulkanApp {
   GLFWwindow* window_;
   const uint32_t WIDTH = 800;
   const uint32_t HEIGHT = 600;
+
+  const std::string MODEL_PATH = "models/viking_room.obj";
+  const std::string TEXTURE_PATH = "textures/viking_room.png";
   VkInstance instance_;
 
   // Handle debug messages from validation layers
@@ -132,25 +135,27 @@ class VulkanApp {
   bool frame_buffer_resized_ = false;
 
   // Temporarily put vertex data here for development
-  const std::vector<Vertex> vertices_ = {
-      // Vertex, color
-      {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
-      {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
-      {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
-  
-      {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
-      {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
-      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
-      {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
-  };
+  //const std::vector<Vertex> vertices_ = {
+  //    // Vertex, color
+  //    {{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
+  //    {{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
+  //    {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  //    {{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
+  //
+  //    {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f,0.0f}},
+  //    {{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f,0.0f}},
+  //    {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+  //    {{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {1.0f,1.0f}},
+  //};
 
   // Indices into vertices_ representing triangles of the model.
-  const std::vector<uint16_t> indices_ = {
-    0,1,2,
-    2,3,0,
-    4,5,6,
-    6,7,4};
+  //const std::vector<uint16_t> indices_ = {
+  //  0,1,2,
+  //  2,3,0,
+  //  4,5,6,
+  //  6,7,4};
+  std::vector<Vertex> vertices_;
+  std::vector<uint32_t> indices_;
 
   VkBuffer vertex_buffer_;
   VkDeviceMemory vertex_buffer_memory_;
@@ -439,6 +444,10 @@ class VulkanApp {
   /* Indicates whether the chosen format has a stencil component
   */
   bool hasStencilComponent(VkFormat format);
+
+  /* Load obj model with tinyobjloader
+  */
+  void loadModel();
 };
 
 }  // namespace va

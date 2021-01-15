@@ -4,9 +4,12 @@
 #include <chrono>
 #include <iostream>
 #include <set>
+
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h> 
 
 namespace va{
 VkResult VulkanApp::CreateDebugUtilsMessengerEXT(
@@ -70,6 +73,7 @@ void VulkanApp::initVulkan() {
   createTextureImage();
   createTextureImageView();
   createTextureSampler();
+  loadModel();
   createVertexBuffer();
   createIndexBuffer();
   createUniformBuffers();
@@ -1133,7 +1137,7 @@ void VulkanApp::createCommandBuffers(){
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers_, offsets);
     vkCmdBindIndexBuffer(command_buffers_[i], index_buffer_, 0,
-      VK_INDEX_TYPE_UINT16);
+      VK_INDEX_TYPE_UINT32);
 
     // Bind the right descriptor set
     vkCmdBindDescriptorSets(command_buffers_[i],
@@ -1599,7 +1603,7 @@ void VulkanApp::createTextureImage(){
   // Load image
   int t_width, t_height, t_channels;
 
-  stbi_uc* pixels = stbi_load("textures/texture.jpg", &t_width, &t_height,
+  stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &t_width, &t_height,
     &t_channels, STBI_rgb_alpha);
 
   VkDeviceSize image_size = t_width*t_height*4;
@@ -1938,5 +1942,35 @@ bool VulkanApp::hasStencilComponent(VkFormat format){
   return format == VK_FORMAT_D32_SFLOAT_S8_UINT
     || format == VK_FORMAT_D24_UNORM_S8_UINT
     || format == VK_FORMAT_D16_UNORM_S8_UINT;
+}
+
+void VulkanApp::loadModel(){
+  tinyobj::attrib_t attrib;
+  std::vector<tinyobj::shape_t> shapes;
+  std::vector<tinyobj::material_t> materials;
+  std::string warn,err;
+  if(!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+    MODEL_PATH.c_str())){
+    throw std::runtime_error(warn + err);
+  }
+
+  for(const auto& shape : shapes){
+    for(const auto & idx : shape.mesh.indices){
+      Vertex vertex{};
+      vertex.pos = {
+        attrib.vertices[3*idx.vertex_index],
+        attrib.vertices[3*idx.vertex_index+1],
+        attrib.vertices[3*idx.vertex_index+2]
+      };
+      vertex.texCoord = {
+        attrib.texcoords[2*idx.texcoord_index],
+        attrib.texcoords[2*idx.texcoord_index+1]
+      };
+      vertex.color = {1.0f, 1.0f, 1.0f};
+
+      vertices_.push_back(vertex);
+      indices_.push_back(indices_.size());
+    }
+  }
 }
 }// namespace va
