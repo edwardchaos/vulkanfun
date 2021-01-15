@@ -91,11 +91,6 @@ void VulkanApp::mainLoop() {
 void VulkanApp::cleanUp() {
   cleanUpSwapChain();
 
-  // Depth image
-  vkDestroyImage(logical_device_, depth_image_, nullptr);
-  vkFreeMemory(logical_device_, depth_image_memory_, nullptr);
-  vkDestroyImageView(logical_device_, depth_image_view_, nullptr);
-
   // Texture sampler
   vkDestroySampler(logical_device_, texture_sampler_, nullptr);
 
@@ -1273,6 +1268,7 @@ void VulkanApp::recreateSwapChain(){
   createImageViews();
   createRenderPass();
   createGraphicsPipeline();
+  createDepthResources();
   createFrameBuffers();
   createUniformBuffers();
   createDescriptorPool();
@@ -1281,6 +1277,11 @@ void VulkanApp::recreateSwapChain(){
 }
 
 void VulkanApp::cleanUpSwapChain(){
+  // Depth image
+  vkDestroyImage(logical_device_, depth_image_, nullptr);
+  vkFreeMemory(logical_device_, depth_image_memory_, nullptr);
+  vkDestroyImageView(logical_device_, depth_image_view_, nullptr);
+
   for(auto framebuffer : swapchain_frame_buffers_){
     vkDestroyFramebuffer(logical_device_, framebuffer, nullptr);
   }
